@@ -1,0 +1,12 @@
+{
+  "model": "PointPillars torch.compile deployment",
+  "n_params": 4828262,
+  "backend": "inductor+max-autotune",
+  "onnx_mb": 18,
+  "pytorch_p50_ms": 3.69,
+  "pytorch_fps": 235.1,
+  "compiled_p50_ms": 2.44,
+  "compiled_fps": 408.8,
+  "speedup": 1.51,
+  "gpu": "NVIDIA GeForce RTX 4090"
+}
