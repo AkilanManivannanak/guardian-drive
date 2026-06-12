@@ -1,7 +1,7 @@
 # Guardian Drive™
 ### Multimodal AI Driver Safety System
 
-> **Built by** Akila Lourdes Miriyala Francis & Akilan Manivannan · LIU Brooklyn MS Artificial Intelligence · 2026
+> **Built by** Akilan Manivannan & Akila Lourdes Miriyala Francis· LIU Brooklyn MS Artificial Intelligence · 2026
 
 ---
 
