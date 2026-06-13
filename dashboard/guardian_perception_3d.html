@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Guardian Drive — 3D Perception View</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0a0f; color:#e2e8f0; font-family:'JetBrains Mono',monospace; overflow:hidden; }
+
+#header {
+  position:absolute; top:0; left:0; right:0; height:36px;
+  background:rgba(0,0,0,0.85); border-bottom:1px solid #1e3a5f;
+  display:flex; align-items:center; padding:0 16px; gap:16px; z-index:100;
+}
+#header .logo { color:#38bdf8; font-size:13px; font-weight:700; letter-spacing:.15em; }
+#header .scenario { background:#1e3a5f; color:#38bdf8; padding:2px 10px;
+  border-radius:12px; font-size:10px; letter-spacing:.1em; }
+#header .live { color:#22c55e; font-size:10px; margin-left:auto; }
+#header .live::before { content:'● '; }
+
+#canvas3d { width:100vw; height:100vh; display:block; }
+
+/* HUD overlays */
+#hud-left {
+  position:absolute; left:12px; top:48px; width:200px; z-index:50;
+}
+#hud-right {
+  position:absolute; right:12px; top:48px; width:180px; z-index:50;
+}
+#hud-bottom {
+  position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+  display:flex; gap:8px; z-index:50;
+}
+
+.hud-panel {
+  background:rgba(0,8,20,0.82); border:1px solid rgba(56,189,248,0.25);
+  border-radius:4px; padding:8px 10px; margin-bottom:6px;
+}
+.hud-title {
+  font-size:8px; color:#38bdf8; letter-spacing:.15em; margin-bottom:6px;
+}
+.hud-row {
+  display:flex; justify-content:space-between; font-size:9px;
+  color:#94a3b8; margin-bottom:3px;
+}
+.hud-val { color:#e2e8f0; }
+.hud-val.green { color:#22c55e; }
+.hud-val.yellow { color:#fbbf24; }
+.hud-val.red { color:#ef4444; }
+
+.stat-bar {
+  height:2px; background:#1e293b; border-radius:1px; margin-top:2px;
+}
+.stat-bar-fill {
+  height:100%; border-radius:1px; transition:width .3s;
+}
+
+/* Detection legend */
+.legend-item {
+  display:flex; align-items:center; gap:6px;
+  font-size:8px; color:#94a3b8; margin-bottom:3px;
+}
+.legend-box {
+  width:12px; height:8px; border:1.5px solid; border-radius:1px;
+}
+
+/* Mini camera strip */
+#cam-strip {
+  position:absolute; bottom:12px; left:12px; right:12px;
+  height:80px; display:flex; gap:4px; z-index:50;
+  background:rgba(0,8,20,0.7); border:1px solid rgba(56,189,248,0.15);
+  border-radius:4px; padding:4px;
+}
+.cam-thumb {
+  flex:1; background:#0f1729; border-radius:2px; position:relative;
+  overflow:hidden;
+}
+.cam-thumb canvas { width:100%; height:100%; display:block; }
+.cam-label {
+  position:absolute; bottom:2px; left:3px;
+  font-size:6px; color:#38bdf8; font-family:monospace;
+}
+
+/* Mode buttons */
+#mode-bar {
+  position:absolute; top:48px; left:50%; transform:translateX(-50%);
+  display:flex; gap:4px; z-index:100;
+}
+.mode-btn {
+  padding:3px 10px; font-size:8px; letter-spacing:.1em;
+  border:1px solid rgba(56,189,248,0.3); border-radius:2px;
+  background:rgba(0,8,20,0.8); color:#64748b; cursor:pointer;
+  font-family:'JetBrains Mono',monospace; transition:all .2s;
+}
+.mode-btn.active { background:rgba(56,189,248,0.15); color:#38bdf8; border-color:#38bdf8; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span class="logo">GUARDIAN DRIVE</span>
+  <span class="scenario" id="hdr-scenario">PERCEPTION</span>
+  <span style="font-size:9px;color:#475569;">Autoware-style 3D AV Stack</span>
+  <span class="live" id="hdr-live">LIVE 00:00:00</span>
+</div>
+
+<div id="mode-bar">
+  <button class="mode-btn active" onclick="setMode('perception')">PERCEPTION</button>
+  <button class="mode-btn" onclick="setMode('planning')">PLANNING</button>
+  <button class="mode-btn" onclick="setMode('localization')">LOCALIZATION</button>
+  <button class="mode-btn" onclick="setMode('guardian')">GUARDIAN</button>
+</div>
+
+<!-- Left HUD -->
+<div id="hud-left">
+  <div class="hud-panel">
+    <div class="hud-title">● EGO STATUS</div>
+    <div class="hud-row"><span>Speed</span><span class="hud-val green" id="ego-speed">0 km/h</span></div>
+    <div class="hud-row"><span>Heading</span><span class="hud-val" id="ego-heading">N 0°</span></div>
+    <div class="hud-row"><span>GPS</span><span class="hud-val green" id="ego-gps">40.678, -73.944</span></div>
+    <div class="hud-row"><span>Localization</span><span class="hud-val green">GNSS+SLAM</span></div>
+  </div>
+
+  <div class="hud-panel">
+    <div class="hud-title">● PERCEPTION</div>
+    <div class="hud-row"><span>LiDAR pts</span><span class="hud-val" id="lidar-pts">34,752</span></div>
+    <div class="hud-row"><span>Objects</span><span class="hud-val yellow" id="obj-count">0</span></div>
+    <div class="hud-row"><span>FPS</span><span class="hud-val green" id="perc-fps">30</span></div>
+    <div class="hud-row"><span>Model</span><span class="hud-val">PointPillars</span></div>
+    <div class="hud-row"><span>Latency</span><span class="hud-val green" id="perc-lat">4.1ms</span></div>
+  </div>
+
+  <div class="hud-panel">
+    <div class="hud-title">● DETECTION CLASSES</div>
+    <div class="legend-item"><div class="legend-box" style="border-color:#22c55e"></div><span>Car / Truck</span></div>
+    <div class="legend-item"><div class="legend-box" style="border-color:#3b82f6"></div><span>Pedestrian</span></div>
+    <div class="legend-item"><div class="legend-box" style="border-color:#f59e0b"></div><span>Cyclist / Moto</span></div>
+    <div class="legend-item"><div class="legend-box" style="border-color:#8b5cf6"></div><span>Bus / Trailer</span></div>
+    <div class="legend-item"><div class="legend-box" style="border-color:#ef4444"></div><span>Risk Zone</span></div>
+  </div>
+</div>
+
+<!-- Right HUD -->
+<div id="hud-right">
+  <div class="hud-panel">
+    <div class="hud-title">● GUARDIAN SAFETY</div>
+    <div class="hud-row"><span>Risk</span><span class="hud-val red" id="g-risk">0.882</span></div>
+    <div class="hud-row"><span>State</span><span class="hud-val red" id="g-state">ESCALATE</span></div>
+    <div class="hud-row"><span>Cardiac</span><span class="hud-val" id="g-cardiac">0.85</span></div>
+    <div class="hud-row"><span>Drowsy</span><span class="hud-val" id="g-drowsy">0.00</span></div>
+    <div class="hud-row"><span>Crash</span><span class="hud-val red" id="g-crash">9.2g</span></div>
+  </div>
+
+  <div class="hud-panel">
+    <div class="hud-title">● PLANNING</div>
+    <div class="hud-row"><span>Mode</span><span class="hud-val green" id="plan-mode">NORMAL</span></div>
+    <div class="hud-row"><span>TTC</span><span class="hud-val yellow" id="plan-ttc">4.2s</span></div>
+    <div class="hud-row"><span>Lane</span><span class="hud-val green">CENTER</span></div>
+    <div class="hud-row"><span>Next ER</span><span class="hud-val" id="plan-er">0.4 mi</span></div>
+  </div>
+
+  <div class="hud-panel">
+    <div class="hud-title">● MODULE STATUS</div>
+    <div class="hud-row"><span>LiDAR</span><span class="hud-val green">● ONLINE</span></div>
+    <div class="hud-row"><span>Camera</span><span class="hud-val green">● ONLINE</span></div>
+    <div class="hud-row"><span>GPS</span><span class="hud-val green">● ONLINE</span></div>
+    <div class="hud-row"><span>Cardiac</span><span class="hud-val green">● ONLINE</span></div>
+    <div class="hud-row"><span>Dispatch</span><span class="hud-val yellow">● ARMED</span></div>
+  </div>
+</div>
+
+<!-- Camera strip -->
+<div id="cam-strip">
+  <div class="cam-thumb"><canvas id="ct0"></canvas><div class="cam-label">FRONT</div></div>
+  <div class="cam-thumb"><canvas id="ct1"></canvas><div class="cam-label">F-LEFT</div></div>
+  <div class="cam-thumb"><canvas id="ct2"></canvas><div class="cam-label">F-RIGHT</div></div>
+  <div class="cam-thumb"><canvas id="ct3"></canvas><div class="cam-label">BACK</div></div>
+  <div class="cam-thumb"><canvas id="ct4"></canvas><div class="cam-label">B-LEFT</div></div>
+  <div class="cam-thumb"><canvas id="ct5"></canvas><div class="cam-label">B-RIGHT</div></div>
+</div>
+
+<canvas id="canvas3d"></canvas>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// Guardian Drive — Autoware-style 3D Perception Renderer
+// Uses Canvas 2D with isometric projection (no WebGL dep)
+// ═══════════════════════════════════════════════════════
+
+const canvas = document.getElementById('canvas3d');
+const ctx = canvas.getContext('2d');
+
+let W, H, cx, cy;
+let frame = 0;
+let lastData = null;
+let mode = 'perception';
+
+// Camera state
+let camAngleX = 35; // elevation degrees
+let camAngleZ = 45; // azimuth degrees
+let camDist   = 80;
+let camTarget = {x:0, y:0, z:0};
+let isDragging = false;
+let lastMouse  = {x:0, y:0};
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W/2; cy = H/2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Projection ──────────────────────────────────────────
+function project(x, y, z) {
+  const ax = camAngleX * Math.PI/180;
+  const az = camAngleZ * Math.PI/180;
+
+  // Rotate around Z
+  const rx = x*Math.cos(az) - y*Math.sin(az);
+  const ry = x*Math.sin(az) + y*Math.cos(az);
+  const rz = z;
+
+  // Rotate around X (elevation)
+  const fx = rx;
+  const fy = ry*Math.cos(ax) - rz*Math.sin(ax);
+  const fz = ry*Math.sin(ax) + rz*Math.cos(ax);
+
+  // Perspective
+  const scale = 600 / (camDist + fz);
+  return {
+    sx: cx + fx*scale,
+    sy: cy - fy*scale,
+    scale: scale,
+    depth: fz,
+  };
+}
+
+// ── Synthetic LiDAR point cloud ─────────────────────────
+let pointCloud = [];
+let detections = [];
+let laneLines  = [];
+let trajectory = [];
+
+function generateScene(seed) {
+  const rng = mulberry32(seed);
+  pointCloud = [];
+  detections = [];
+  laneLines  = [];
+  trajectory = [];
+
+  // Ground plane points
+  for(let i=0; i<2000; i++) {
+    const r = rng()*80;
+    const theta = rng()*Math.PI*2;
+    const x = r*Math.cos(theta);
+    const y = r*Math.sin(theta);
+    const z = -1.8 + rng()*0.3;
+    const intensity = 0.2 + rng()*0.3;
+    pointCloud.push({x, y, z, intensity, type:'ground'});
+  }
+
+  // Road surface (denser ahead)
+  for(let i=0; i<1500; i++) {
+    const x = (rng()-0.5)*14;
+    const y = rng()*60 - 5;
+    const z = -1.75 + rng()*0.05;
+    const intensity = 0.4 + rng()*0.3;
+    pointCloud.push({x, y, z, intensity, type:'road'});
+  }
+
+  // Building/wall points
+  for(let b=0; b<8; b++) {
+    const bx = (rng()-0.5)*100;
+    const by = (rng()-0.5)*100;
+    const bh = 3 + rng()*15;
+    for(let i=0; i<80; i++) {
+      pointCloud.push({
+        x: bx + (rng()-0.5)*4,
+        y: by + (rng()-0.5)*4,
+        z: rng()*bh - 1.8,
+        intensity: 0.5+rng()*0.5,
+        type:'structure'
+      });
+    }
+  }
+
+  // Vegetation
+  for(let i=0; i<300; i++) {
+    const r = 20 + rng()*50;
+    const theta = rng()*Math.PI*2;
+    pointCloud.push({
+      x: r*Math.cos(theta),
+      y: r*Math.sin(theta),
+      z: rng()*4 - 1.8,
+      intensity: 0.3+rng()*0.4,
+      type:'vegetation'
+    });
+  }
+
+  // Generate detections
+  const classes = [
+    {name:'car',    color:'#22c55e', w:4.5, l:2.0, h:1.5},
+    {name:'truck',  color:'#22c55e', w:7.0, l:2.5, h:2.5},
+    {name:'ped',    color:'#3b82f6', w:0.8, l:0.6, h:1.8},
+    {name:'cyclist',color:'#f59e0b', w:1.8, l:0.7, h:1.7},
+    {name:'bus',    color:'#8b5cf6', w:10.0,l:2.8, h:3.2},
+  ];
+
+  const nDets = 6 + Math.floor(rng()*8);
+  for(let i=0; i<nDets; i++) {
+    const cls = classes[Math.floor(rng()*classes.length)];
+    const dx = (rng()-0.5)*50;
+    const dy = 5 + rng()*45;
+    const dz = -1.8 + cls.h/2;
+    const conf = 0.75 + rng()*0.24;
+    const vel  = Math.floor(rng()*35);
+    const id   = Math.floor(rng()*0x10000).toString(16).slice(0,4);
+    detections.push({
+      x:dx, y:dy, z:dz,
+      w:cls.w, l:cls.l, h:cls.h,
+      color:cls.color,
+      name:cls.name,
+      conf:conf,
+      vel:vel,
+      id:id,
+    });
+
+    // Add object points
+    for(let p=0; p<40; p++) {
+      pointCloud.push({
+        x: dx+(rng()-0.5)*cls.w,
+        y: dy+(rng()-0.5)*cls.l,
+        z: dz+(rng()-0.5)*cls.h,
+        intensity:0.8+rng()*0.2,
+        type:'object',
+        color:cls.color,
+      });
+    }
+  }
+
+  // Lane lines
+  const laneW = 3.7;
+  for(let lane=-1; lane<=1; lane++) {
+    const lx = lane*laneW;
+    const pts = [];
+    for(let t=0; t<=20; t++) {
+      const y = t*4;
+      const z = -1.75;
+      pts.push({x:lx, y:y, z:z});
+    }
+    laneLines.push({pts, color: lane===0?'#ef4444':'#fbbf24', dashed:lane!==0});
+  }
+
+  // Planned trajectory (green arc)
+  for(let t=0; t<=30; t++) {
+    const y = t*2;
+    const x = Math.sin(t*0.05)*2;
+    trajectory.push({x, y, z:-1.7});
+  }
+}
+
+function mulberry32(seed) {
+  let s = seed;
+  return function() {
+    s += 0x6D2B79F5;
+    let z = s;
+    z = Math.imul(z^(z>>>15), z|1);
+    z ^= z + Math.imul(z^(z>>>7), z|61);
+    return ((z^(z>>>14))>>>0)/4294967296;
+  };
+}
+
+// ── Draw functions ───────────────────────────────────────
+
+function drawGrid() {
+  const size = 80;
+  const step = 10;
+  ctx.strokeStyle = 'rgba(30,58,100,0.4)';
+  ctx.lineWidth = 0.5;
+
+  for(let x=-size; x<=size; x+=step) {
+    const p1 = project(x, -size, -1.8);
+    const p2 = project(x,  size, -1.8);
+    ctx.beginPath();
+    ctx.moveTo(p1.sx, p1.sy);
+    ctx.lineTo(p2.sx, p2.sy);
+    ctx.stroke();
+  }
+  for(let y=-size; y<=size; y+=step) {
+    const p1 = project(-size, y, -1.8);
+    const p2 = project( size, y, -1.8);
+    ctx.beginPath();
+    ctx.moveTo(p1.sx, p1.sy);
+    ctx.lineTo(p2.sx, p2.sy);
+    ctx.stroke();
+  }
+}
+
+function drawPointCloud() {
+  // Sort by depth for painter's algorithm
+  const sorted = [...pointCloud].sort((a,b) => {
+    const pa = project(a.x,a.y,a.z);
+    const pb = project(b.x,b.y,b.z);
+    return pb.depth - pa.depth;
+  });
+
+  for(const pt of sorted) {
+    const p = project(pt.x, pt.y, pt.z);
+    if(p.sx < -10 || p.sx > W+10 || p.sy < -10 || p.sy > H+10) continue;
+
+    const sz = Math.max(0.8, p.scale*0.015);
+
+    // Color by type
+    let color;
+    if(pt.type==='object' && pt.color) {
+      color = pt.color + '99';
+    } else if(pt.type==='road') {
+      const g = Math.floor(120+pt.intensity*80);
+      color = `rgb(${g},${g+20},${g+40})`;
+    } else if(pt.type==='ground') {
+      const g = Math.floor(60+pt.intensity*60);
+      color = `rgb(${g},${g},${g+10})`;
+    } else if(pt.type==='structure') {
+      const g = Math.floor(80+pt.intensity*100);
+      color = `rgb(${g+20},${g+30},${g+50})`;
+    } else if(pt.type==='vegetation') {
+      color = `rgba(34,${Math.floor(100+pt.intensity*100)},34,0.7)`;
+    } else {
+      color = `rgba(150,200,255,0.5)`;
+    }
+
+    ctx.fillStyle = color;
+    ctx.fillRect(p.sx-sz/2, p.sy-sz/2, sz, sz);
+  }
+}
+
+function drawLaneLines() {
+  for(const lane of laneLines) {
+    const pts2d = lane.pts.map(p => project(p.x, p.y, p.z));
+    ctx.strokeStyle = lane.color;
+    ctx.lineWidth = lane.dashed ? 1.5 : 2;
+    ctx.setLineDash(lane.dashed ? [8,6] : []);
+    ctx.beginPath();
+    let first=true;
+    for(const p of pts2d) {
+      if(p.sx < -100 || p.sx > W+100) { first=true; continue; }
+      if(first) { ctx.moveTo(p.sx, p.sy); first=false; }
+      else ctx.lineTo(p.sx, p.sy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function drawTrajectory() {
+  if(trajectory.length < 2) return;
+  const pts2d = trajectory.map(p => project(p.x, p.y, p.z));
+
+  // Green glowing path
+  ctx.shadowColor = '#22c55e';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  let first=true;
+  for(const p of pts2d) {
+    if(first) { ctx.moveTo(p.sx, p.sy); first=false; }
+    else ctx.lineTo(p.sx, p.sy);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawEgo() {
+  // Ego vehicle at origin
+  const carW=2.0, carL=4.5, carH=1.5;
+  drawBox3D(0, 0, -1.8+carH/2, carL, carW, carH, '#38bdf8', true);
+
+  // Sensor range rings
+  ctx.strokeStyle = 'rgba(56,189,248,0.08)';
+  ctx.lineWidth = 1;
+  for(const r of [20,40,60,80]) {
+    const pts = [];
+    for(let a=0; a<36; a++) {
+      const ang = a/36*Math.PI*2;
+      pts.push(project(r*Math.cos(ang), r*Math.sin(ang), -1.8));
+    }
+    ctx.beginPath();
+    pts.forEach((p,i) => i===0?ctx.moveTo(p.sx,p.sy):ctx.lineTo(p.sx,p.sy));
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
+function drawBox3D(cx, cy, cz, l, w, h, color, isEgo=false) {
+  const hw=w/2, hl=l/2, hh=h/2;
+  // 8 corners
+  const corners = [
+    [-hl,-hw,-hh], [ hl,-hw,-hh], [ hl, hw,-hh], [-hl, hw,-hh],
+    [-hl,-hw, hh], [ hl,-hw, hh], [ hl, hw, hh], [-hl, hw, hh],
+  ].map(([dx,dy,dz]) => project(cx+dx, cy+dy, cz+dz));
+
+  const edges = [
+    [0,1],[1,2],[2,3],[3,0], // bottom
+    [4,5],[5,6],[6,7],[7,4], // top
+    [0,4],[1,5],[2,6],[3,7], // verticals
+  ];
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = isEgo ? 2 : 1.5;
+  if(isEgo) { ctx.shadowColor=color; ctx.shadowBlur=10; }
+
+  for(const [a,b] of edges) {
+    ctx.beginPath();
+    ctx.moveTo(corners[a].sx, corners[a].sy);
+    ctx.lineTo(corners[b].sx, corners[b].sy);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+}
+
+function drawDetections() {
+  for(const det of detections) {
+    // Animate slight movement
+    const t = frame * 0.01;
+    const mx = det.vel>0 ? Math.sin(t+det.x)*0.05 : 0;
+    const my = det.vel>0 ? det.vel*0.016 : 0;
+
+    const dx = det.x + mx;
+    const dy = det.y - my*0.5 + my*0.5;
+
+    drawBox3D(dx, dy, det.z, det.l, det.w, det.h, det.color);
+
+    // Label
+    const p = project(dx, dy, det.z + det.h);
+    if(p.sx > 0 && p.sx < W && p.sy > 0 && p.sy < H) {
+      ctx.fillStyle = det.color;
+      ctx.font = `${Math.max(8, p.scale*8)}px monospace`;
+      ctx.fillText(`${det.name}:${det.id}`, p.sx+3, p.sy-3);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = `${Math.max(7, p.scale*7)}px monospace`;
+      ctx.fillText(`${det.vel}[km/h]`, p.sx+3, p.sy+8);
+
+      // Confidence bar
+      const barW = Math.max(20, p.scale*20);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(p.sx, p.sy+10, barW, 3);
+      ctx.fillStyle = det.color;
+      ctx.fillRect(p.sx, p.sy+10, barW*det.conf, 3);
+    }
+  }
+}
+
+function drawRedCorridor() {
+  // Red risk corridor ahead
+  const width = 3.5;
+  const length = 35;
+  const corners2d = [
+    project(-width, 2, -1.75),
+    project( width, 2, -1.75),
+    project( width, length, -1.75),
+    project(-width, length, -1.75),
+  ];
+  ctx.fillStyle = 'rgba(239,68,68,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(corners2d[0].sx, corners2d[0].sy);
+  corners2d.forEach(p => ctx.lineTo(p.sx, p.sy));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(239,68,68,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  ctx.moveTo(corners2d[0].sx, corners2d[0].sy);
+  corners2d.forEach(p => ctx.lineTo(p.sx, p.sy));
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ── Main render loop ─────────────────────────────────────
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Dark background gradient
+  const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W,H)*0.7);
+  bg.addColorStop(0, '#0d1b2a');
+  bg.addColorStop(1, '#050a10');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  drawGrid();
+  drawRedCorridor();
+  drawLaneLines();
+  drawTrajectory();
+  drawPointCloud();
+  drawEgo();
+  drawDetections();
+
+  // Frame counter / scanline effect
+  if(frame%3===0) {
+    ctx.fillStyle = 'rgba(56,189,248,0.02)';
+    ctx.fillRect(0, (frame*3)%H, W, 1);
+  }
+
+  frame++;
+  updateHUD();
+  requestAnimationFrame(render);
+}
+
+// ── HUD updates ──────────────────────────────────────────
+function updateHUD() {
+  const t = frame/30;
+  document.getElementById('ego-speed').textContent =
+    Math.floor(25+Math.sin(t*0.3)*8) + ' km/h';
+  document.getElementById('ego-heading').textContent =
+    'N ' + Math.floor(355+Math.sin(t*0.1)*5) + '°';
+  document.getElementById('obj-count').textContent = detections.length;
+  document.getElementById('perc-fps').textContent =
+    Math.floor(28+Math.random()*4);
+  document.getElementById('perc-lat').textContent =
+    (3.8+Math.random()*0.8).toFixed(1)+'ms';
+  document.getElementById('plan-ttc').textContent =
+    (3.5+Math.sin(t*0.5)*1.5).toFixed(1)+'s';
+
+  // Time
+  const now = new Date();
+  document.getElementById('hdr-live').textContent =
+    'LIVE ' + now.toTimeString().slice(0,8);
+}
+
+// ── Backend data ─────────────────────────────────────────
+async function fetchData() {
+  try {
+    const r = await fetch('http://localhost:8000/latest');
+    if(!r.ok) return;
+    const d = await r.json();
+    lastData = d;
+
+    // Update guardian values
+    if(d.risk !== undefined) {
+      const risk = d.risk || 0;
+      document.getElementById('g-risk').textContent = risk.toFixed(3);
+      document.getElementById('g-risk').className =
+        'hud-val ' + (risk>0.8?'red':risk>0.5?'yellow':'green');
+    }
+    if(d.policy_action) {
+      document.getElementById('g-state').textContent = d.policy_action;
+    }
+    if(d.cardiac_score !== undefined) {
+      document.getElementById('g-cardiac').textContent =
+        d.cardiac_score.toFixed(2);
+    }
+    if(d.drowsy_score !== undefined) {
+      document.getElementById('g-drowsy').textContent =
+        d.drowsy_score.toFixed(2);
+    }
+    if(d.crash_g !== undefined) {
+      document.getElementById('g-crash').textContent =
+        d.crash_g.toFixed(1)+'g';
+    }
+    if(d.er_distance !== undefined) {
+      document.getElementById('plan-er').textContent =
+        d.er_distance + ' mi';
+    }
+
+    // Update camera thumbnails
+    if(d.cam_images) {
+      d.cam_images.forEach((b64, i) => {
+        if(!b64) return;
+        const cv = document.getElementById(`ct${i}`);
+        if(!cv) return;
+        cv.width = cv.offsetWidth || 120;
+        cv.height = cv.offsetHeight || 72;
+        const c = cv.getContext('2d');
+        const img = new Image();
+        img.onload = () => c.drawImage(img, 0, 0, cv.width, cv.height);
+        img.src = 'data:image/jpeg;base64,' + b64 + '#' + Date.now();
+      });
+    }
+
+    // Regenerate scene based on sample token
+    if(d.sample_token) {
+      const seed = parseInt(d.sample_token.slice(0,8), 16) % (2**31);
+      generateScene(seed);
+    }
+
+  } catch(e) {
+    // Backend not connected — use demo mode
+  }
+}
+
+// ── Mouse interaction ────────────────────────────────────
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastMouse = {x:e.clientX, y:e.clientY};
+});
+canvas.addEventListener('mouseup', () => isDragging=false);
+canvas.addEventListener('mousemove', e => {
+  if(!isDragging) return;
+  const dx = e.clientX - lastMouse.x;
+  const dy = e.clientY - lastMouse.y;
+  camAngleZ += dx * 0.4;
+  camAngleX = Math.max(10, Math.min(80, camAngleX + dy * 0.3));
+  lastMouse = {x:e.clientX, y:e.clientY};
+});
+canvas.addEventListener('wheel', e => {
+  camDist = Math.max(20, Math.min(200, camDist + e.deltaY*0.1));
+  e.preventDefault();
+}, {passive:false});
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.toLowerCase()===m);
+  });
+  document.getElementById('hdr-scenario').textContent = m.toUpperCase();
+}
+
+// ── Init ─────────────────────────────────────────────────
+generateScene(42);
+render();
+setInterval(fetchData, 500);
+fetchData();
+</script>
+</body>
+</html>
