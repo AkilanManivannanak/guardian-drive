@@ -871,6 +871,34 @@ function apply(d){
     if(pl){ pl.href=bh.nav_url||'#'; pl.textContent='Navigate →'; }
   }
 
+  // NYC Live Traffic Cameras
+  const nycImages = d.nyc_cameras || [];
+  const nycNames  = d.nyc_cam_names || [];
+  const nycNearest = d.nyc_nearest || '';
+
+  if(nycNearest) {
+    const nn = document.getElementById('nyc-nearest');
+    if(nn) nn.textContent = '📍 ' + nycNearest;
+  }
+
+  [0,1].forEach(i => {
+    const cv = document.getElementById(`nyc-cam-${i}`);
+    if(!cv || !nycImages[i]) return;
+    const img = new Image();
+    img.onload = () => {
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0,0,cv.width,cv.height);
+      ctx.drawImage(img,0,0,cv.width,cv.height);
+      // Label
+      ctx.fillStyle='rgba(0,0,0,0.6)';
+      ctx.fillRect(0,cv.height-14,cv.width,14);
+      ctx.fillStyle='#3b82f6';
+      ctx.font='7px monospace';
+      ctx.fillText((nycNames[i]||'').slice(0,25), 3, cv.height-4);
+    };
+    img.src = 'data:image/jpeg;base64,' + nycImages[i] + '#' + Date.now();
+  });
+
   // Emergency Dispatch
   const dispatchAction = d.dispatch_action || '';
   const dispatchStage  = d.dispatch_stage  || 0;
@@ -1019,7 +1047,10 @@ function apply(d){
         cv.height=cv.clientHeight||130;
         cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
       };
-      img.src='data:image/jpeg;base64,'+b64;
+      // Force cache bust + clear canvas first
+      const ctx2=cv.getContext('2d');
+      ctx2.clearRect(0,0,cv.width,cv.height);
+      img.src='data:image/jpeg;base64,'+b64+'#'+Date.now();
     });
   }
   if(d.cam_trust){
@@ -1070,6 +1101,10 @@ document.addEventListener("DOMContentLoaded", function(){
     rp.appendChild(dp);
   }
 });
+</script>
+
+<script>
+// NYC cameras panel injected
 </script>
 </body>
 </html>

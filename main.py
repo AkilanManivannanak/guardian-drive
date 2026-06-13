@@ -584,6 +584,16 @@ def main() -> None:
 
             render(fb, rs, action, i + 1, args.scenario,
                    time.monotonic() - t0, webcam_metrics=webcam_metrics)
+            # ── NYC LIVE TRAFFIC CAMERAS ─────────────────────────────────────
+            try:
+                from integrations.nyc_live_cameras import get_nyc_feed as _get_nyc
+                _nyc = _get_nyc()
+                _nyc_lat = 40.6782
+                _nyc_lon = -73.9442
+                _nyc_frames = _nyc.get_frames(_nyc_lat, _nyc_lon)
+            except Exception as _ne:
+                _nyc_frames = {}
+
             # ── DYNAMIC HOSPITAL ROUTING ─────────────────────────────────────
             try:
                 from integrations.hospital_routing import get_router as _get_router
@@ -799,6 +809,10 @@ def main() -> None:
                     "er_wait":             _best_hospital['wait_min'] if _best_hospital else 12,
                     "er_total":            _best_hospital['total_min'] if _best_hospital else 17,
                     "er_nav_url":          _best_hospital['nav_url'] if _best_hospital else "",
+                    "nyc_cameras":         _nyc_frames.get('cam_images',[]),
+                    "nyc_cam_names":       _nyc_frames.get('cam_names',[]),
+                    "nyc_nearest":         _nyc_frames.get('nearest_cam',''),
+                    "nyc_source":          _nyc_frames.get('source',''),
                     "dispatch_stage":      getattr(_chain,"_stage",0) if "_chain" in dir() else 0,
                     "lidar_active":        False,
                 }
