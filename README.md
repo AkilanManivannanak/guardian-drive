@@ -375,16 +375,25 @@ training participants only. Transitional/artifact windows are filtered out.
 python -m generative.wesad_diffusion \
   --wesad-root /path/to/WESAD \
   --epochs 50 \
-  --samples-per-class 100
+  --samples-per-class 500
+
+python -m generative.evaluate_wesad_augmentation \
+  --wesad-root /path/to/WESAD \
+  --checkpoint outputs/wesad_conditional_ddpm.pt \
+  --synthetic outputs/wesad_conditional_ddpm_synthetic.npz \
+  --synthetic-per-class 500
 ```
 
 The training command reports noise-prediction MSE on the subject-held-out
 windows and saves a checkpoint plus optional normalized synthetic windows under
-`outputs/`. This is a **prototype** until trained and independently evaluated
-with the separately licensed WESAD data. Held-out denoising loss is a training
-diagnostic; it does not establish synthetic-data fidelity, privacy, downstream
-utility, or clinical validity. The generated windows must not be presented as
-real measurements or used for diagnosis.
+`outputs/`. The evaluation command compares the same logistic-regression probe
+trained on real data against real-plus-synthetic data, then reports balanced
+accuracy and macro-F1 separately for each unseen subject, with paired
+subject-bootstrap intervals. This is a **prototype** until trained and
+independently evaluated with the separately licensed WESAD data. Denoising loss
+does not establish synthetic-data fidelity, and a downstream gain does not
+establish privacy or clinical validity. Generated windows must not be presented
+as real measurements or used for diagnosis.
 
 #### RSSM World Model — Dreamer-style Offline RL
 ```
