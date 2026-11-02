@@ -3,6 +3,32 @@
 
 > **Built by** Akilan Manivannan & Akila Lourdes Miriyala Francis· LIU Brooklyn MS Artificial Intelligence · 2026
 
+## Generative Modeling & Simulation
+
+This project combines a runnable, deterministic sensor simulator with PyTorch
+generative-modeling prototypes for driving trajectories and wearable signals.
+The work most relevant to generative time-series modeling is in
+[`generative/wesad_diffusion.py`](generative/wesad_diffusion.py): a class-
+conditional 1D DDPM for 10-second WESAD wrist-sensor windows (BVP, EDA,
+temperature, and 3-axis acceleration), with participant-level train/held-out
+splits, train-only normalization, classifier-free guidance, and EMA sampling.
+The companion
+[`generative/evaluate_wesad_augmentation.py`](generative/evaluate_wesad_augmentation.py)
+compares a real-only probe with a real-plus-synthetic probe on unseen
+participants and reports per-subject metrics with bootstrap intervals.
+
+**Experiment status:** implementation and CI smoke coverage are present. The
+full WESAD training and held-out augmentation evaluation have not been run in
+this checkout because the separately licensed raw dataset is not included.
+There are no reported WESAD diffusion quality or downstream-improvement
+results yet. The deterministic simulator in
+[`acquisition/simulator.py`](acquisition/simulator.py) supports reproducible
+pipeline demonstrations; it is explicitly synthetic and is not a physiological
+or multiphysics model.
+
+For setup, commands, evaluation protocol, and limitations, see
+[Conditional DDPM — WESAD Wearable Time-Series](#conditional-ddpm--wesad-wearable-time-series-prototype).
+
 ---
 
 ## One-Line Summary
