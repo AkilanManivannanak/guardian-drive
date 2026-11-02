@@ -1,8 +1,9 @@
-"""Compare real-only and DDPM-augmented WESAD classifiers on unseen people.
+"""Compare real-only and DDPM-augmented WESAD classifiers on reserved people.
 
-The generated windows must have been sampled from a model that did not train on
-any evaluation subject. This benchmark is an engineering utility experiment,
-not clinical validation or a privacy guarantee.
+The generated windows must come from a model trained without the validation or
+test participants. New checkpoints reserve test participants before training;
+only validation participants can inform model selection. This benchmark is an
+engineering utility experiment, not clinical validation or a privacy guarantee.
 """
 from __future__ import annotations
 
@@ -54,7 +55,10 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--synthetic", type=Path, required=True,
                         help="NPZ emitted by wesad_diffusion.py --samples-per-class")
-    parser.add_argument("--test-subjects", default=",".join(map(str, DEFAULT_HELDOUT)))
+    parser.add_argument(
+        "--test-subjects", default=None,
+        help="Override the checkpoint's reserved test subjects (must remain disjoint)",
+    )
     parser.add_argument("--synthetic-per-class", type=int, default=500)
     parser.add_argument("--output", type=Path, default=Path("outputs/wesad_augmentation_eval.json"))
     args = parser.parse_args()
@@ -63,10 +67,28 @@ def main() -> None:
     # pickle. Load only checkpoints from trusted local runs.
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     train_subjects = set(checkpoint["train_subjects"])
-    test_subjects = subject_ids(args.test_subjects)
+    validation_subjects = set(checkpoint.get("validation_subjects", ()))
+    configured_test_subjects = tuple(
+        checkpoint.get(
+            "test_subjects",
+            checkpoint.get("heldout_subjects", DEFAULT_HELDOUT),
+        )
+    )
+    test_subjects = subject_ids(args.test_subjects) if args.test_subjects else configured_test_subjects
+    if len(test_subjects) != len(set(test_subjects)):
+        parser.error("--test-subjects must not contain duplicates")
     overlap = train_subjects.intersection(test_subjects)
     if overlap:
         parser.error(f"Test subjects overlap generator training subjects: {sorted(overlap)}")
+    validation_overlap = validation_subjects.intersection(test_subjects)
+    if validation_overlap:
+        parser.error(
+            f"Test subjects overlap model-selection subjects: {sorted(validation_overlap)}"
+        )
+    if "test_subjects" in checkpoint and not set(test_subjects).issubset(
+        configured_test_subjects
+    ):
+        parser.error("Evaluation subjects must come from the checkpoint's reserved test split")
 
     with np.load(args.synthetic, allow_pickle=False) as archive:
         synthetic = archive["windows"].astype(np.float32)
@@ -137,8 +159,9 @@ def main() -> None:
         )
 
     result = {
-        "protocol": "subject-held-out; same LogisticRegression features and settings",
+        "protocol": "reserved participant test split; same LogisticRegression features and settings",
         "generator_train_subjects": sorted(train_subjects),
+        "generator_validation_subjects": sorted(validation_subjects),
         "evaluation_subjects": [f"S{item}" for item in test_subjects],
         "synthetic_windows_per_class": args.synthetic_per_class,
         "class_labels": list(CLASS_LABELS),

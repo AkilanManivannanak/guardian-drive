@@ -25,9 +25,9 @@
 
 Guardian Drive combines a deterministic multi-sensor simulator, a WebSocket dashboard, driving-perception experiments, and a conditional diffusion prototype for wearable time-series. It is a portfolio and research prototype, not a deployed vehicle safety system.
 
-The most role-relevant work is the WESAD conditional 1D DDPM in [`generative/wesad_diffusion.py`](generative/wesad_diffusion.py). It prepares 10-second wrist-sensor windows, separates train and held-out participants, fits normalization on training participants, and supports classifier-free guidance and EMA sampling. The companion [`generative/evaluate_wesad_augmentation.py`](generative/evaluate_wesad_augmentation.py) defines a held-out evaluation comparing real-only training with real-plus-synthetic augmentation.
+The most role-relevant work is the WESAD conditional 1D DDPM in [`generative/wesad_diffusion.py`](generative/wesad_diffusion.py). It prepares 10-second wrist-sensor windows, uses separate training, validation, and reserved test participants, fits normalization on training participants only, and supports classifier-free guidance and EMA sampling. Two evaluation paths are provided: [`generative/evaluate_wesad_fidelity.py`](generative/evaluate_wesad_fidelity.py) measures class-conditional signal statistics on reserved participants, while [`generative/evaluate_wesad_augmentation.py`](generative/evaluate_wesad_augmentation.py) compares real-only training with real-plus-synthetic augmentation on the same reserved test split.
 
-> **WESAD experiment status:** The code and CI smoke coverage are present, but full diffusion training and the held-out augmentation evaluation have not been run in this checkout. The raw WESAD dataset is separately licensed and was not found in the available project files. This repository reports no diffusion quality or downstream augmentation gain.
+> **WESAD experiment status:** The code and CI smoke coverage are present, but full diffusion training and the fidelity and augmentation evaluations have not been run in this checkout. The raw WESAD dataset is separately licensed and was not found in the available project files. This repository reports no diffusion quality or downstream augmentation gain.
 
 ## Visual tour
 
@@ -70,7 +70,7 @@ Try `normal`, `drowsy`, or `crash_severe` with `--scenario`. These are simulated
 
 ## Conditional diffusion for WESAD
 
-The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. It includes participant-level splitting, train-only normalization, class balancing, classifier-free condition dropout/guidance, and exponential-moving-average weights.
+The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. Its default participant split is training S2-S9/S14/S17, validation S10-S11, and reserved test S13/S15/S16. The training command never loads the reserved test signals. Normalization is fitted on training participants only. The model also uses class balancing, classifier-free condition dropout/guidance, and exponential-moving-average weights.
 
 Training and evaluation require a local WESAD copy obtained under its dataset terms:
 
@@ -80,6 +80,12 @@ python -m generative.wesad_diffusion \
   --epochs 50 \
   --samples-per-class 500
 
+python -m generative.evaluate_wesad_fidelity \
+  --wesad-root /path/to/WESAD \
+  --checkpoint outputs/wesad_conditional_ddpm.pt \
+  --synthetic outputs/wesad_conditional_ddpm_synthetic.npz \
+  --synthetic-per-class 500
+
 python -m generative.evaluate_wesad_augmentation \
   --wesad-root /path/to/WESAD \
   --checkpoint outputs/wesad_conditional_ddpm.pt \
@@ -87,7 +93,7 @@ python -m generative.evaluate_wesad_augmentation \
   --synthetic-per-class 500
 ```
 
-The evaluation script is designed to report per-held-out-subject balanced accuracy and macro-F1 with bootstrap intervals. Until it is run on the licensed data, there are no empirical claims here about fidelity, privacy, or downstream benefit. Generated signals must not be presented as real measurements.
+The fidelity report includes per-channel distribution shifts, Wasserstein distance, log-spectral distance, autocorrelation error, cross-channel correlation error, and participant-bootstrap intervals, broken out by class. These are descriptive diagnostics without validated pass thresholds. The augmentation report measures per-test-participant balanced accuracy and macro-F1 with paired bootstrap intervals. Both scripts enforce separation from the generator's training and validation participants. Until they are run on the licensed data, there are no empirical claims here about fidelity, privacy, or downstream benefit. Generated signals must not be presented as real measurements.
 
 ## Evidence and limitations
 
