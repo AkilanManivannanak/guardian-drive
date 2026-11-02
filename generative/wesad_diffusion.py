@@ -11,7 +11,7 @@ import copy
 import math
 import pickle
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
@@ -195,9 +195,22 @@ class DiffusionSchedule:
         labels: torch.Tensor,
         shape: Tuple[int, int, int],
         guidance_scale: float = 1.0,
+        sampling_steps: Optional[int] = None,
+        eta: float = 0.0,
     ) -> torch.Tensor:
+        """Sample with a DDIM trajectory; eta=0 gives a deterministic path."""
+        steps = self.steps if sampling_steps is None else sampling_steps
+        if not 1 <= steps <= self.steps:
+            raise ValueError("sampling_steps must be between 1 and the training schedule length")
+        if not 0.0 <= eta <= 1.0:
+            raise ValueError("eta must be between 0 and 1")
+        timestep_indices = np.linspace(self.steps - 1, 0, steps, dtype=np.int64)
         x = torch.randn(shape, device=labels.device)
-        for index in reversed(range(self.steps)):
+        for position, timestep in enumerate(timestep_indices):
+            index = int(timestep)
+            previous_index = (
+                int(timestep_indices[position + 1]) if position + 1 < len(timestep_indices) else -1
+            )
             t = torch.full((len(labels),), index, device=labels.device, dtype=torch.long)
             conditional = model(x, t, labels)
             if guidance_scale == 1.0:
@@ -207,20 +220,27 @@ class DiffusionSchedule:
                 unconditional = model(x, t, unconditional_labels)
                 prediction = unconditional + guidance_scale * (conditional - unconditional)
             alpha_bar = self.alpha_bar[index]
-            alpha_bar_previous = self.alpha_bar_previous[index]
-            beta = self.beta[index]
-            alpha = self.alpha[index]
             predicted_clean = (
                 x - (1.0 - alpha_bar).sqrt() * prediction
             ) / alpha_bar.sqrt()
             # Training windows are clipped to this normalized range; clipping
             # x0 during reverse diffusion prevents rare exploding trajectories.
             predicted_clean = predicted_clean.clamp(-5.0, 5.0)
-            clean_coefficient = beta * alpha_bar_previous.sqrt() / (1.0 - alpha_bar)
-            noisy_coefficient = (1.0 - alpha_bar_previous) * alpha.sqrt() / (1.0 - alpha_bar)
-            x = clean_coefficient * predicted_clean + noisy_coefficient * x
-            if index > 0:
-                x = x + self.posterior_variance[index].sqrt() * torch.randn_like(x)
+            alpha_bar_previous = (
+                self.alpha_bar[previous_index]
+                if previous_index >= 0
+                else torch.ones((), device=labels.device)
+            )
+            sigma = eta * torch.sqrt(
+                ((1.0 - alpha_bar_previous) / (1.0 - alpha_bar).clamp(min=1e-20))
+                * (1.0 - alpha_bar / alpha_bar_previous)
+            )
+            direction = torch.sqrt(
+                (1.0 - alpha_bar_previous - sigma.square()).clamp(min=0.0)
+            ) * prediction
+            x = alpha_bar_previous.sqrt() * predicted_clean + direction
+            if eta > 0.0 and previous_index >= 0:
+                x = x + sigma * torch.randn_like(x)
         return x
 
 
@@ -244,7 +264,15 @@ def main() -> None:
     )
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--diffusion-steps", type=int, default=100)
+    parser.add_argument("--diffusion-steps", type=int, default=1000)
+    parser.add_argument(
+        "--sampling-steps", type=int, default=50,
+        help="Number of DDIM inference steps used when generating windows",
+    )
+    parser.add_argument(
+        "--sampling-eta", type=float, default=0.0,
+        help="DDIM stochasticity (0 is deterministic conditional on the initial noise)",
+    )
     parser.add_argument("--condition-dropout", type=float, default=0.1,
                         help="Probability of dropping class conditioning during training")
     parser.add_argument("--guidance-scale", type=float, default=1.5,
@@ -277,6 +305,10 @@ def main() -> None:
         parser.error("--condition-dropout must be in [0, 1)")
     if args.guidance_scale < 0.0:
         parser.error("--guidance-scale must be non-negative")
+    if not 1 <= args.sampling_steps <= args.diffusion_steps:
+        parser.error("--sampling-steps must be between 1 and --diffusion-steps")
+    if not 0.0 <= args.sampling_eta <= 1.0:
+        parser.error("--sampling-eta must be between 0 and 1")
     if not 0.0 <= args.ema_decay < 1.0:
         parser.error("--ema-decay must be in [0, 1)")
     torch.manual_seed(args.seed)
@@ -366,6 +398,8 @@ def main() -> None:
             "window_samples": WINDOW,
             "sample_rate_hz": FS,
             "diffusion_steps": args.diffusion_steps,
+            "sampling_steps": args.sampling_steps,
+            "sampling_eta": args.sampling_eta,
             "beta_schedule": "cosine",
             "terminal_alpha_bar": float(schedule.alpha_bar[-1].cpu()),
             "sample_clean_clip": 5.0,
@@ -393,6 +427,8 @@ def main() -> None:
                         labels,
                         (batch_count, len(CHANNELS), WINDOW),
                         guidance_scale=args.guidance_scale,
+                        sampling_steps=args.sampling_steps,
+                        eta=args.sampling_eta,
                     )
                     generated.append(batch.cpu().numpy().transpose(0, 2, 1))
                     generated_labels.extend([CLASS_LABELS[class_index]] * batch_count)
