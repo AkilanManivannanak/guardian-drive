@@ -27,7 +27,7 @@ Guardian Drive combines a deterministic multi-sensor simulator, a WebSocket dash
 
 The most role-relevant work is the WESAD conditional 1D DDPM in [`generative/wesad_diffusion.py`](generative/wesad_diffusion.py). It prepares 10-second wrist-sensor windows, uses separate training, validation, and reserved test participants, fits normalization on training participants only, and supports classifier-free guidance and EMA sampling. Two evaluation paths are provided: [`generative/evaluate_wesad_fidelity.py`](generative/evaluate_wesad_fidelity.py) measures class-conditional signal statistics on reserved participants, while [`generative/evaluate_wesad_augmentation.py`](generative/evaluate_wesad_augmentation.py) compares real-only training with real-plus-synthetic augmentation on the same reserved test split.
 
-> **WESAD experiment status:** The code and CI smoke coverage are present, but full diffusion training and the fidelity and augmentation evaluations have not been run in this checkout. The raw WESAD dataset is separately licensed and was not found in the available project files. This repository reports no diffusion quality or downstream augmentation gain.
+> **WESAD experiment status:** A local, participant-disjoint WESAD run has been completed and its protocol, measured results, and limitations are documented in [`docs/research/wesad-ddpm-evaluation.md`](docs/research/wesad-ddpm-evaluation.md). The raw dataset, checkpoints, and generated windows are not included. The current experiment does not show a downstream augmentation benefit.
 
 ## Visual tour
 
@@ -95,7 +95,7 @@ python -m generative.evaluate_wesad_augmentation \
   --synthetic-per-class 500
 ```
 
-The fidelity report includes per-channel distribution shifts, Wasserstein distance, log-spectral distance, autocorrelation error, cross-channel correlation error, and participant-bootstrap intervals, broken out by class. These are descriptive diagnostics without validated pass thresholds. The augmentation report measures per-test-participant balanced accuracy and macro-F1 with paired bootstrap intervals. Both scripts enforce separation from the generator's training and validation participants. Until they are run on the licensed data, there are no empirical claims here about fidelity, privacy, or downstream benefit. Generated signals must not be presented as real measurements.
+The fidelity report includes per-channel distribution shifts, Wasserstein distance, log-spectral distance, autocorrelation error, cross-channel correlation error, and participant-bootstrap intervals, broken out by class. These are descriptive diagnostics without validated pass thresholds. The augmentation report measures per-test-participant balanced accuracy and macro-F1 with paired bootstrap intervals. Both scripts enforce separation from the generator's training and validation participants. The linked evaluation report records the current result and its limitations; generated signals must not be presented as real measurements.
 
 Dataset citation: P. Schmidt, A. Reiss, R. Duerichen, C. Marberger, and K. Van Laerhoven, “Introducing WESAD: a Multimodal Dataset for Wearable Stress and Affect Detection,” ICMI 2018, doi: [10.1145/3242969.3242985](https://doi.org/10.1145/3242969.3242985).
 
@@ -105,7 +105,7 @@ Sampler reference: J. Song, C. Meng, and S. Ermon, “Denoising Diffusion Implic
 
 - The CI workflow runs unit and smoke checks, validates tracked benchmark-result files, and checks the fusion weights.
 - Individual experiment artifacts are under [`outputs/`](outputs/); read each artifact's protocol and source before quoting a metric.
-- The earlier WESAD TCN window-level AUC of 0.9738 is flagged for subject leakage; the documented LOSO AUC is 0.6712 ([`policy/medical_guardrail.py`](policy/medical_guardrail.py)). These are baseline results, separate from the unrun diffusion experiment, and are not presented as deployment evidence.
+- The earlier WESAD TCN window-level AUC of 0.9738 is flagged for subject leakage; the documented LOSO AUC is 0.6712 ([`policy/medical_guardrail.py`](policy/medical_guardrail.py)). These are baseline results, separate from the diffusion experiment, and are not presented as deployment evidence.
 - The deterministic generator in [`acquisition/simulator.py`](acquisition/simulator.py) is synthetic. It is not a physiological or multiphysics model.
 - No clinical validation, prospective road testing, safety certification, or COMSOL multiphysics validation is claimed.
 
