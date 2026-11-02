@@ -70,7 +70,7 @@ Try `normal`, `drowsy`, or `crash_severe` with `--scenario`. These are simulated
 
 ## Conditional diffusion for WESAD
 
-The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. Its default participant split is training S2-S9/S14/S17, validation S10-S11, and reserved test S13/S15/S16. The training command never loads the reserved test signals. Normalization is fitted on training participants only. The model also uses class balancing, classifier-free condition dropout/guidance, and exponential-moving-average weights.
+The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. Its default participant split is training S2-S9/S14/S17, validation S10-S11, and reserved test S13/S15/S16. The training command never loads the reserved test signals. Normalization is fitted on training participants only. The model also uses class balancing, classifier-free condition dropout/guidance, and exponential-moving-average weights. Training automatically uses CUDA, Apple Metal Performance Shaders (MPS), or CPU, in that order.
 
 Training and evaluation require a local WESAD copy obtained under its dataset terms:
 
