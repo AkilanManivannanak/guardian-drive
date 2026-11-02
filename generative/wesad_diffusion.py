@@ -269,7 +269,13 @@ def main() -> None:
         replacement=True,
     )
     loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler, drop_last=False)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"device={device}")
     model = ConditionalDenoiser().to(device)
     ema_model = copy.deepcopy(model).eval()
     for parameter in ema_model.parameters():
