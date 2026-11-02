@@ -362,6 +362,30 @@ Conditioning    BEVFormer features (184.6 M encoder) as cross-attention context
 Checkpoint      outputs/diffusion_model.pt
 ```
 
+#### Conditional DDPM — WESAD Wearable Time-Series (Prototype)
+
+`generative/wesad_diffusion.py` adds a separate conditional 1D DDPM for 10-second
+wrist-sensor windows: BVP, EDA, temperature, and three-axis acceleration. It
+uses the WESAD baseline, stress, and amusement labels; a residual 1D U-Net is
+conditioned on diffusion time and class. The default split holds out entire
+participants (S10, S11, S13, S15, S16), and normalization statistics are fit on
+training participants only. Transitional/artifact windows are filtered out.
+
+```bash
+python -m generative.wesad_diffusion \
+  --wesad-root /path/to/WESAD \
+  --epochs 50 \
+  --samples-per-class 100
+```
+
+The training command reports noise-prediction MSE on the subject-held-out
+windows and saves a checkpoint plus optional normalized synthetic windows under
+`outputs/`. This is a **prototype** until trained and independently evaluated
+with the separately licensed WESAD data. Held-out denoising loss is a training
+diagnostic; it does not establish synthetic-data fidelity, privacy, downstream
+utility, or clinical validity. The generated windows must not be presented as
+real measurements or used for diagnosis.
+
 #### RSSM World Model — Dreamer-style Offline RL
 ```
 Architecture    GRU deterministic path (256-D) + Normal stochastic path (64-D)
