@@ -7,6 +7,7 @@ WESAD is distributed separately; see its license and provide a local path.
 from __future__ import annotations
 
 import argparse
+import copy
 import math
 import pickle
 from pathlib import Path
@@ -25,6 +26,7 @@ WINDOW = FS * WINDOW_SECONDS
 STRIDE = WINDOW // 2
 CHANNELS = ("bvp", "eda", "temp", "acc_x", "acc_y", "acc_z")
 CLASS_LABELS = (1, 2, 3)  # WESAD: baseline, stress, amusement
+UNCONDITIONAL_LABEL = len(CLASS_LABELS)
 DEFAULT_TRAIN = (2, 3, 4, 5, 6, 7, 8, 9, 14, 17)
 DEFAULT_HELDOUT = (10, 11, 13, 15, 16)
 
@@ -126,7 +128,7 @@ class ResidualBlock(nn.Module):
 class ConditionalDenoiser(nn.Module):
     """Small 1D U-Net denoiser conditioned on diffusion time and WESAD class."""
 
-    def __init__(self, channels: int = len(CHANNELS), width: int = 64, classes: int = 3):
+    def __init__(self, channels: int = len(CHANNELS), width: int = 64, classes: int = 4):
         super().__init__()
         self.time_mlp = nn.Sequential(
             nn.Linear(width, width * 2), nn.SiLU(), nn.Linear(width * 2, width)
@@ -167,13 +169,23 @@ class DiffusionSchedule:
 
     @torch.no_grad()
     def sample(
-        self, model: nn.Module, labels: torch.Tensor, shape: Tuple[int, int, int]
+        self,
+        model: nn.Module,
+        labels: torch.Tensor,
+        shape: Tuple[int, int, int],
+        guidance_scale: float = 1.0,
     ) -> torch.Tensor:
         x = torch.randn(shape, device=labels.device)
         for index in reversed(range(self.steps)):
             t = torch.full((len(labels),), index, device=labels.device, dtype=torch.long)
             beta, alpha = self.beta[index], self.alpha[index]
-            prediction = model(x, t, labels)
+            conditional = model(x, t, labels)
+            if guidance_scale == 1.0:
+                prediction = conditional
+            else:
+                unconditional_labels = torch.full_like(labels, UNCONDITIONAL_LABEL)
+                unconditional = model(x, t, unconditional_labels)
+                prediction = unconditional + guidance_scale * (conditional - unconditional)
             x = (x - beta / (1 - self.alpha_bar[index]).sqrt() * prediction) / alpha.sqrt()
             if index > 0:
                 x = x + beta.sqrt() * torch.randn_like(x)
@@ -194,6 +206,12 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--diffusion-steps", type=int, default=100)
+    parser.add_argument("--condition-dropout", type=float, default=0.1,
+                        help="Probability of dropping class conditioning during training")
+    parser.add_argument("--guidance-scale", type=float, default=1.5,
+                        help="Classifier-free guidance scale for generated windows")
+    parser.add_argument("--ema-decay", type=float, default=0.995,
+                        help="Exponential moving average decay for denoiser weights")
     parser.add_argument(
         "--samples-per-class",
         type=int,
@@ -209,6 +227,12 @@ def main() -> None:
     train_subjects, heldout_subjects = subject_ids(args.train_subjects), subject_ids(args.heldout_subjects)
     if set(train_subjects) & set(heldout_subjects):
         parser.error("Training and held-out subject lists must be disjoint")
+    if not 0.0 <= args.condition_dropout < 1.0:
+        parser.error("--condition-dropout must be in [0, 1)")
+    if args.guidance_scale < 0.0:
+        parser.error("--guidance-scale must be non-negative")
+    if not 0.0 <= args.ema_decay < 1.0:
+        parser.error("--ema-decay must be in [0, 1)")
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     train, train_labels = collect_windows(args.wesad_root, train_subjects)
@@ -230,6 +254,9 @@ def main() -> None:
     loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler, drop_last=False)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ConditionalDenoiser().to(device)
+    ema_model = copy.deepcopy(model).eval()
+    for parameter in ema_model.parameters():
+        parameter.requires_grad_(False)
     schedule = DiffusionSchedule(args.diffusion_steps, device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4)
 
@@ -241,16 +268,22 @@ def main() -> None:
             step = torch.randint(args.diffusion_steps, (len(clean),), device=device)
             noise = torch.randn_like(clean)
             noisy = schedule.add_noise(clean, step, noise)
-            loss = F.mse_loss(model(noisy, step, labels), noise)
+            conditioned_labels = labels.clone()
+            dropped = torch.rand(len(labels), device=device) < args.condition_dropout
+            conditioned_labels[dropped] = UNCONDITIONAL_LABEL
+            loss = F.mse_loss(model(noisy, step, conditioned_labels), noise)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
+            with torch.no_grad():
+                for ema_parameter, parameter in zip(ema_model.parameters(), model.parameters()):
+                    ema_parameter.mul_(args.ema_decay).add_(parameter, alpha=1.0 - args.ema_decay)
             losses.append(float(loss.detach().cpu()))
         print(f"epoch={epoch + 1:03d} train_noise_mse={np.mean(losses):.5f}")
 
     # A fixed, subject-disjoint validation loss checks denoising generalization.
-    model.eval()
+    ema_model.eval()
     rng = np.random.default_rng(args.seed + 1)
     heldout_tensor = torch.from_numpy(heldout).transpose(1, 2).to(device)
     heldout_target = torch.from_numpy(heldout_labels - 1).to(device)
@@ -265,7 +298,7 @@ def main() -> None:
             validation_losses.append(
                 float(
                     F.mse_loss(
-                        model(schedule.add_noise(clean, step, noise), step, labels), noise
+                        ema_model(schedule.add_noise(clean, step, noise), step, labels), noise
                     ).cpu()
                 )
             )
@@ -273,7 +306,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
-            "model": model.cpu().state_dict(),
+            "model": ema_model.cpu().state_dict(),
             "mean": mean,
             "std": std,
             "channels": CHANNELS,
@@ -281,6 +314,9 @@ def main() -> None:
             "window_samples": WINDOW,
             "sample_rate_hz": FS,
             "diffusion_steps": args.diffusion_steps,
+            "condition_dropout": args.condition_dropout,
+            "guidance_scale": args.guidance_scale,
+            "ema_decay": args.ema_decay,
             "train_subjects": train_subjects,
             "heldout_subjects": heldout_subjects,
             "heldout_noise_mse": float(np.mean(validation_losses)),
@@ -296,7 +332,12 @@ def main() -> None:
                 while remaining:
                     batch_count = min(args.batch_size, remaining)
                     labels = torch.full((batch_count,), class_index, device=device, dtype=torch.long)
-                    batch = schedule.sample(model.to(device), labels, (batch_count, len(CHANNELS), WINDOW))
+                    batch = schedule.sample(
+                        ema_model.to(device),
+                        labels,
+                        (batch_count, len(CHANNELS), WINDOW),
+                        guidance_scale=args.guidance_scale,
+                    )
                     generated.append(batch.cpu().numpy().transpose(0, 2, 1))
                     generated_labels.extend([CLASS_LABELS[class_index]] * batch_count)
                     remaining -= batch_count

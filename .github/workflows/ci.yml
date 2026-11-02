@@ -23,6 +23,7 @@ jobs:
           python tests/test_sqi.py
           python tests/test_state_machine.py
           python tests/test_ear.py
+          python -m pytest tests/test_wesad_diffusion.py -q
           echo "All tests passed"
       - name: Verify benchmark results exist
         run: |
