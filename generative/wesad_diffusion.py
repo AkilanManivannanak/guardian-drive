@@ -344,6 +344,31 @@ def main() -> None:
     schedule = DiffusionSchedule(args.diffusion_steps, device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-4)
 
+    # Use a fixed validation corruption set so epoch-to-epoch noise-MSE is
+    # comparable. Model selection uses validation participants only; the
+    # reserved test participants are never loaded by this training command.
+    validation_tensor = torch.from_numpy(validation).transpose(1, 2).to(device)
+    validation_target = torch.from_numpy(validation_labels - 1).to(device)
+    validation_count = min(2048, len(validation_tensor))
+    validation_rng = np.random.default_rng(args.seed + 1)
+    validation_indices = torch.as_tensor(
+        validation_rng.choice(len(validation_tensor), validation_count, replace=False),
+        device=device,
+    )
+    validation_clean = validation_tensor[validation_indices]
+    validation_classes = validation_target[validation_indices]
+    validation_noise = torch.randn(
+        validation_clean.shape, generator=torch.Generator(device=device).manual_seed(args.seed + 2),
+        device=device,
+    )
+    validation_steps = torch.randint(
+        args.diffusion_steps, (validation_count,),
+        generator=torch.Generator(device=device).manual_seed(args.seed + 3), device=device,
+    )
+    best_validation_mse = float("inf")
+    best_epoch = 0
+    best_state = None
+
     for epoch in range(args.epochs):
         model.train()
         losses: List[float] = []
@@ -364,28 +389,37 @@ def main() -> None:
                 for ema_parameter, parameter in zip(ema_model.parameters(), model.parameters()):
                     ema_parameter.mul_(args.ema_decay).add_(parameter, alpha=1.0 - args.ema_decay)
             losses.append(float(loss.detach().cpu()))
-        print(f"epoch={epoch + 1:03d} train_noise_mse={np.mean(losses):.5f}")
-
-    # A fixed, subject-disjoint validation loss checks denoising generalization.
-    ema_model.eval()
-    rng = np.random.default_rng(args.seed + 1)
-    validation_tensor = torch.from_numpy(validation).transpose(1, 2).to(device)
-    validation_target = torch.from_numpy(validation_labels - 1).to(device)
-    count = min(2048, len(validation_tensor))
-    indices = torch.as_tensor(rng.choice(len(validation_tensor), count, replace=False), device=device)
-    validation_losses: List[float] = []
-    with torch.no_grad():
-        for batch_indices in indices.split(args.batch_size):
-            clean, labels = validation_tensor[batch_indices], validation_target[batch_indices]
-            step = torch.randint(args.diffusion_steps, (len(clean),), device=device)
-            noise = torch.randn_like(clean)
-            validation_losses.append(
-                float(
-                    F.mse_loss(
-                        ema_model(schedule.add_noise(clean, step, noise), step, labels), noise
-                    ).cpu()
+        ema_model.eval()
+        with torch.no_grad():
+            validation_losses = []
+            for start in range(0, validation_count, args.batch_size):
+                stop = start + args.batch_size
+                prediction = ema_model(
+                    schedule.add_noise(
+                        validation_clean[start:stop], validation_steps[start:stop],
+                        validation_noise[start:stop],
+                    ),
+                    validation_steps[start:stop], validation_classes[start:stop],
                 )
-            )
+                validation_losses.append(
+                    float(F.mse_loss(prediction, validation_noise[start:stop]).cpu())
+                )
+            epoch_validation_mse = float(np.mean(validation_losses))
+        if epoch_validation_mse < best_validation_mse:
+            best_validation_mse = epoch_validation_mse
+            best_epoch = epoch + 1
+            best_state = {
+                name: tensor.detach().cpu().clone()
+                for name, tensor in ema_model.state_dict().items()
+            }
+        print(
+            f"epoch={epoch + 1:03d} train_noise_mse={np.mean(losses):.5f} "
+            f"validation_noise_mse={epoch_validation_mse:.5f} "
+            f"best_epoch={best_epoch:03d}"
+        )
+    if best_state is None:
+        raise RuntimeError("Training completed without a validation checkpoint")
+    ema_model.load_state_dict(best_state)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
@@ -409,7 +443,9 @@ def main() -> None:
             "train_subjects": train_subjects,
             "validation_subjects": validation_subjects,
             "test_subjects": test_subjects,
-            "validation_noise_mse": float(np.mean(validation_losses)),
+            "validation_noise_mse": best_validation_mse,
+            "best_epoch": best_epoch,
+            "validation_selection": "minimum EMA noise MSE on fixed corruption set",
             "seed": args.seed,
         },
         args.output,
@@ -446,7 +482,8 @@ def main() -> None:
         )
         print(f"synthetic_windows={synthetic_path} (normalized; not clinical data)")
     print(f"windows_train={len(train)} windows_validation={len(validation)}")
-    print(f"validation_subject_noise_mse={np.mean(validation_losses):.5f}")
+    print(f"best_epoch={best_epoch}")
+    print(f"validation_subject_noise_mse={best_validation_mse:.5f}")
     print(f"test_subjects_reserved={','.join(map(str, test_subjects))}")
     print(f"checkpoint={args.output}")
 
