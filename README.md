@@ -70,7 +70,7 @@ Try `normal`, `drowsy`, or `crash_severe` with `--scenario`. These are simulated
 
 ## Conditional diffusion for WESAD
 
-The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. Its default participant split is training S2-S9/S14/S17, validation S10-S11, and reserved test S13/S15/S16. The training command never loads the reserved test signals. Normalization is fitted on training participants only. The model also uses class balancing, classifier-free condition dropout/guidance, exponential-moving-average weights, and a cosine noise schedule with the DDPM posterior reverse variance. Training automatically uses CUDA, Apple Metal Performance Shaders (MPS), or CPU, in that order.
+The denoiser is a class-conditional 1D U-Net for BVP, EDA, temperature, and three-axis acceleration. Its default participant split is training S2-S9/S14/S17, validation S10-S11, and reserved test S13/S15/S16. The training command never loads the reserved test signals. Normalization is fitted on training participants only. The model also uses class balancing, classifier-free condition dropout/guidance, exponential-moving-average weights, a cosine forward noise schedule, and a 50-step DDIM sampler by default. Training automatically uses CUDA, Apple Metal Performance Shaders (MPS), or CPU, in that order.
 
 Training and evaluation require a local WESAD copy obtained under its dataset terms. WESAD is for scientific, non-commercial use with attribution; do not commit or redistribute the dataset. See the [official dataset page](https://ubi29.informatik.uni-siegen.de/usi/data_wesad.html).
 
@@ -78,6 +78,8 @@ Training and evaluation require a local WESAD copy obtained under its dataset te
 python -m generative.wesad_diffusion \
   --wesad-root /path/to/WESAD \
   --epochs 50 \
+  --diffusion-steps 1000 \
+  --sampling-steps 50 \
   --samples-per-class 500
 
 python -m generative.evaluate_wesad_fidelity \
@@ -96,6 +98,8 @@ python -m generative.evaluate_wesad_augmentation \
 The fidelity report includes per-channel distribution shifts, Wasserstein distance, log-spectral distance, autocorrelation error, cross-channel correlation error, and participant-bootstrap intervals, broken out by class. These are descriptive diagnostics without validated pass thresholds. The augmentation report measures per-test-participant balanced accuracy and macro-F1 with paired bootstrap intervals. Both scripts enforce separation from the generator's training and validation participants. Until they are run on the licensed data, there are no empirical claims here about fidelity, privacy, or downstream benefit. Generated signals must not be presented as real measurements.
 
 Dataset citation: P. Schmidt, A. Reiss, R. Duerichen, C. Marberger, and K. Van Laerhoven, “Introducing WESAD: a Multimodal Dataset for Wearable Stress and Affect Detection,” ICMI 2018, doi: [10.1145/3242969.3242985](https://doi.org/10.1145/3242969.3242985).
+
+Sampler reference: J. Song, C. Meng, and S. Ermon, “Denoising Diffusion Implicit Models,” ICLR 2021, [arXiv:2010.02502](https://arxiv.org/abs/2010.02502).
 
 ## Evidence and limitations
 
