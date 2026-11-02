@@ -160,11 +160,29 @@ class ConditionalDenoiser(nn.Module):
 
 class DiffusionSchedule:
     def __init__(self, steps: int, device: torch.device):
+        if steps < 2:
+            raise ValueError("Diffusion schedule requires at least two steps")
         self.steps = steps
-        beta = torch.linspace(1e-4, 0.02, steps, device=device)
+        # The cosine cumulative schedule reaches near-zero terminal SNR even
+        # when using a compact 100-step chain. A fixed 1e-4..0.02 linear
+        # schedule leaves substantial signal at T=100, mismatching the pure
+        # Gaussian initialization used by sample().
+        grid = torch.linspace(0, steps, steps + 1, device=device)
+        offset = 0.008
+        cumulative = torch.cos(
+            ((grid / steps + offset) / (1.0 + offset)) * (math.pi / 2.0)
+        ).square()
+        cumulative = cumulative / cumulative[0]
+        beta = (1.0 - cumulative[1:] / cumulative[:-1]).clamp(max=0.999)
         self.alpha_bar = torch.cumprod(1.0 - beta, dim=0)
+        self.alpha_bar_previous = torch.cat(
+            (torch.ones(1, device=device), self.alpha_bar[:-1])
+        )
         self.beta = beta
         self.alpha = 1.0 - beta
+        self.posterior_variance = (
+            beta * (1.0 - self.alpha_bar_previous) / (1.0 - self.alpha_bar).clamp(min=1e-20)
+        )
 
     def add_noise(self, clean: torch.Tensor, step: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
         alpha_bar = self.alpha_bar[step].view(-1, 1, 1)
@@ -181,7 +199,6 @@ class DiffusionSchedule:
         x = torch.randn(shape, device=labels.device)
         for index in reversed(range(self.steps)):
             t = torch.full((len(labels),), index, device=labels.device, dtype=torch.long)
-            beta, alpha = self.beta[index], self.alpha[index]
             conditional = model(x, t, labels)
             if guidance_scale == 1.0:
                 prediction = conditional
@@ -189,9 +206,21 @@ class DiffusionSchedule:
                 unconditional_labels = torch.full_like(labels, UNCONDITIONAL_LABEL)
                 unconditional = model(x, t, unconditional_labels)
                 prediction = unconditional + guidance_scale * (conditional - unconditional)
-            x = (x - beta / (1 - self.alpha_bar[index]).sqrt() * prediction) / alpha.sqrt()
+            alpha_bar = self.alpha_bar[index]
+            alpha_bar_previous = self.alpha_bar_previous[index]
+            beta = self.beta[index]
+            alpha = self.alpha[index]
+            predicted_clean = (
+                x - (1.0 - alpha_bar).sqrt() * prediction
+            ) / alpha_bar.sqrt()
+            # Training windows are clipped to this normalized range; clipping
+            # x0 during reverse diffusion prevents rare exploding trajectories.
+            predicted_clean = predicted_clean.clamp(-5.0, 5.0)
+            clean_coefficient = beta * alpha_bar_previous.sqrt() / (1.0 - alpha_bar)
+            noisy_coefficient = (1.0 - alpha_bar_previous) * alpha.sqrt() / (1.0 - alpha_bar)
+            x = clean_coefficient * predicted_clean + noisy_coefficient * x
             if index > 0:
-                x = x + beta.sqrt() * torch.randn_like(x)
+                x = x + self.posterior_variance[index].sqrt() * torch.randn_like(x)
         return x
 
 
@@ -337,6 +366,9 @@ def main() -> None:
             "window_samples": WINDOW,
             "sample_rate_hz": FS,
             "diffusion_steps": args.diffusion_steps,
+            "beta_schedule": "cosine",
+            "terminal_alpha_bar": float(schedule.alpha_bar[-1].cpu()),
+            "sample_clean_clip": 5.0,
             "condition_dropout": args.condition_dropout,
             "guidance_scale": args.guidance_scale,
             "ema_decay": args.ema_decay,
