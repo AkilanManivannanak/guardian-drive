@@ -28,7 +28,10 @@ CHANNELS = ("bvp", "eda", "temp", "acc_x", "acc_y", "acc_z")
 CLASS_LABELS = (1, 2, 3)  # WESAD: baseline, stress, amusement
 UNCONDITIONAL_LABEL = len(CLASS_LABELS)
 DEFAULT_TRAIN = (2, 3, 4, 5, 6, 7, 8, 9, 14, 17)
-DEFAULT_HELDOUT = (10, 11, 13, 15, 16)
+DEFAULT_VALIDATION = (10, 11)
+DEFAULT_TEST = (13, 15, 16)
+# Retained for older evaluation commands and checkpoints.
+DEFAULT_HELDOUT = DEFAULT_VALIDATION + DEFAULT_TEST
 
 
 def _resample(x: np.ndarray, source_hz: int, target_hz: int = FS) -> np.ndarray:
@@ -202,7 +205,14 @@ def main() -> None:
         "--wesad-root", type=Path, required=True, help="Local WESAD directory (not included)"
     )
     parser.add_argument("--train-subjects", default=",".join(map(str, DEFAULT_TRAIN)))
-    parser.add_argument("--heldout-subjects", default=",".join(map(str, DEFAULT_HELDOUT)))
+    parser.add_argument(
+        "--validation-subjects", default=",".join(map(str, DEFAULT_VALIDATION)),
+        help="Participants used only for denoising validation and model selection",
+    )
+    parser.add_argument(
+        "--test-subjects", default=",".join(map(str, DEFAULT_TEST)),
+        help="Participants reserved for final evaluation; never loaded during training",
+    )
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--diffusion-steps", type=int, default=100)
@@ -224,9 +234,16 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    train_subjects, heldout_subjects = subject_ids(args.train_subjects), subject_ids(args.heldout_subjects)
-    if set(train_subjects) & set(heldout_subjects):
-        parser.error("Training and held-out subject lists must be disjoint")
+    train_subjects = subject_ids(args.train_subjects)
+    validation_subjects = subject_ids(args.validation_subjects)
+    test_subjects = subject_ids(args.test_subjects)
+    if any(len(items) != len(set(items)) for items in (train_subjects, validation_subjects, test_subjects)):
+        parser.error("Subject lists must not contain duplicates")
+    train_set, validation_set, test_set = map(
+        set, (train_subjects, validation_subjects, test_subjects)
+    )
+    if train_set & validation_set or train_set & test_set or validation_set & test_set:
+        parser.error("Training, validation, and test subject lists must be pairwise disjoint")
     if not 0.0 <= args.condition_dropout < 1.0:
         parser.error("--condition-dropout must be in [0, 1)")
     if args.guidance_scale < 0.0:
@@ -236,10 +253,10 @@ def main() -> None:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     train, train_labels = collect_windows(args.wesad_root, train_subjects)
-    heldout, heldout_labels = collect_windows(args.wesad_root, heldout_subjects)
+    validation, validation_labels = collect_windows(args.wesad_root, validation_subjects)
     mean, std = train_normalizer(train)
     train = np.clip((train - mean) / std, -5, 5)
-    heldout = np.clip((heldout - mean) / std, -5, 5)
+    validation = np.clip((validation - mean) / std, -5, 5)
     # Labels 1..3 map to embedding indices 0..2.
     dataset = TensorDataset(
         torch.from_numpy(train).transpose(1, 2), torch.from_numpy(train_labels - 1)
@@ -285,14 +302,14 @@ def main() -> None:
     # A fixed, subject-disjoint validation loss checks denoising generalization.
     ema_model.eval()
     rng = np.random.default_rng(args.seed + 1)
-    heldout_tensor = torch.from_numpy(heldout).transpose(1, 2).to(device)
-    heldout_target = torch.from_numpy(heldout_labels - 1).to(device)
-    count = min(2048, len(heldout_tensor))
-    indices = torch.as_tensor(rng.choice(len(heldout_tensor), count, replace=False), device=device)
+    validation_tensor = torch.from_numpy(validation).transpose(1, 2).to(device)
+    validation_target = torch.from_numpy(validation_labels - 1).to(device)
+    count = min(2048, len(validation_tensor))
+    indices = torch.as_tensor(rng.choice(len(validation_tensor), count, replace=False), device=device)
     validation_losses: List[float] = []
     with torch.no_grad():
         for batch_indices in indices.split(args.batch_size):
-            clean, labels = heldout_tensor[batch_indices], heldout_target[batch_indices]
+            clean, labels = validation_tensor[batch_indices], validation_target[batch_indices]
             step = torch.randint(args.diffusion_steps, (len(clean),), device=device)
             noise = torch.randn_like(clean)
             validation_losses.append(
@@ -318,8 +335,9 @@ def main() -> None:
             "guidance_scale": args.guidance_scale,
             "ema_decay": args.ema_decay,
             "train_subjects": train_subjects,
-            "heldout_subjects": heldout_subjects,
-            "heldout_noise_mse": float(np.mean(validation_losses)),
+            "validation_subjects": validation_subjects,
+            "test_subjects": test_subjects,
+            "validation_noise_mse": float(np.mean(validation_losses)),
             "seed": args.seed,
         },
         args.output,
@@ -353,8 +371,9 @@ def main() -> None:
             sample_rate_hz=FS,
         )
         print(f"synthetic_windows={synthetic_path} (normalized; not clinical data)")
-    print(f"windows_train={len(train)} windows_heldout={len(heldout)}")
-    print(f"heldout_subject_noise_mse={np.mean(validation_losses):.5f}")
+    print(f"windows_train={len(train)} windows_validation={len(validation)}")
+    print(f"validation_subject_noise_mse={np.mean(validation_losses):.5f}")
+    print(f"test_subjects_reserved={','.join(map(str, test_subjects))}")
     print(f"checkpoint={args.output}")
 
 
