@@ -13,7 +13,7 @@ import importlib
 
 from .common import get_profile, out_dir
 
-STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving"]
+STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving", "fem_crosscheck"]
 
 
 def fmt(m):
@@ -117,6 +117,14 @@ def write_report(od):
                     a = v["auroc"]
                     L.append(f"| {reg} | {k} | {fmt(a['clean'])} | {fmt(a['nstdb_6dB'])} | {fmt(a['nstdb_0dB'])} |")
         L.append("")
+    p = od / "fem_crosscheck.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Independent finite-element cross-check of the electrode solver", "",
+              f"P1 finite elements vs finite volume, wet electrode, 1 Hz–10 kHz: max |Z| difference "
+              f"{100 * d['max_rel_error']:.2f} % (mean {100 * d['mean_rel_error']:.2f} %), phase within "
+              f"{d['max_phase_diff_deg']:.2f}°; 20 % lift-off raises |Z| {100 * d['liftoff20_rise_fe']:.2f} % (FE) vs "
+              f"{100 * d['liftoff20_rise_fv']:.2f} % (FV).", ""]
     p = od / "driving_results.json"
     if p.exists():
         d = json.loads(p.read_text())

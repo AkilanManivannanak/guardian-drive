@@ -260,3 +260,10 @@ def test_compare_comsol_roundtrip(tmp_path):
     md.write_text(f"a\n{cc.MARK_BEGIN}\nold\n{cc.MARK_END}\nb\n")
     cc.update_readme(md, "new line")
     assert "new line" in md.read_text() and "old" not in md.read_text()
+
+
+def test_finite_element_matches_finite_volume():
+    from sensing_gen.multiphysics.compare_comsol import python_reference
+    from sensing_gen.multiphysics.electrode_skin_fem import fem_impedance
+    for f in (10.0, 1000.0):
+        assert abs(abs(fem_impedance(f)) / abs(python_reference([f])[0]) - 1) < 0.01

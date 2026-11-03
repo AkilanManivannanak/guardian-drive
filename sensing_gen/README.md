@@ -120,6 +120,7 @@ so compare distances within a table, not across tables.
 * The ECG ODE, calibrated by gradient descent through the simulator, explains **3,907 real median beats** with median **R² = 0.951** (IQR 0.91–0.97); see `fig_calibration.png`.
 * The electrode–skin multiphysics solver is verified to **2×10⁻⁴** (analytic thin strip), **10⁻¹⁰** (reciprocity) and **7×10⁻⁵** (grid convergence).
   It predicts 21.5 kΩ (gel) vs 443 kΩ (dry) at 10 Hz, near-zero pressure sensitivity for gel but κ ≈ 0.4 for dry electrodes, and lift-off sensitivity κ ≈ 0.6.
+* **Independent finite-element check:** `multiphysics/electrode_skin_fem.py` (P1 triangles, contact-impedance Robin condition) agrees with the finite-volume solver to 0.46 % max / 0.10 % mean in |Z| over 1 Hz–10 kHz, with phase within 0.14° and an identical 11.9 % rise at 20 % lift-off (`fem_crosscheck.json`, `fig_fem_crosscheck.png`).
 <!-- COMSOL-CHECK:BEGIN -->
 * **COMSOL cross-check:** not run yet. See the [step-by-step guide](multiphysics/comsol/README.md); `python -m sensing_gen.multiphysics.compare_comsol` fills this line with the measured agreement.
 <!-- COMSOL-CHECK:END -->

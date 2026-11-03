@@ -61,7 +61,7 @@ The most role-relevant work is [`sensing_gen/`](sensing_gen/): simulation and ge
 | Diffusion sampler bug diagnosed and fixed (no retraining) | saturated samples **40 % → 0.5 %**; real-vs-fake discriminator **0.96 → 0.63** | same |
 | Train-on-synthetic-test-on-real (diffusion) vs train-on-real | **0.829** vs 0.801 AUROC | same |
 | Differentiable ECG simulator calibrated to real beats | **3,907 beats, median R² 0.951** | [`calibration_results.json`](outputs/sensing_gen/calibration_results.json) |
-| Electrode–skin multiphysics FV solver, analytic verification | error **2×10⁻⁴**; wet 21.5 kΩ vs dry 443 kΩ at 10 Hz | [`multiphysics_results.json`](outputs/sensing_gen/multiphysics_results.json) |
+| Electrode–skin multiphysics FV solver: analytic check and independent FE check | error **2×10⁻⁴** (analytic), **≤ 0.46 %** vs finite elements; wet 21.5 kΩ vs dry 443 kΩ at 10 Hz | [`multiphysics_results.json`](outputs/sensing_gen/multiphysics_results.json) |
 | Inverse PINN, real ECG + real noise at 0 dB | **7.7 dB** vs 6.3 dB band-pass (filtering wins at ≥ 6 dB) | [`pinn_results.json`](outputs/sensing_gen/pinn_results.json) |
 | Real in-car ECG (PhysioNet drivedb, 18 drives), false cardiac alarms at a 10 % design rate | **13.9 %** (transfers); augmentation gives no further gain (driver-bootstrap CIs include 0) | [`driving_results.json`](outputs/sensing_gen/driving_results.json) |
 | CARLA 0.9.15, 7 town scenarios | **320 → 2** collisions vs no intervention | [`carla_real_evaluation_results.json`](outputs/carla_real_evaluation_results.json) |
@@ -166,6 +166,7 @@ Guidance was ruled out by a sweep (still 39 % broken at w = 0). Root cause: DDIM
 
 * Median R² 0.951 (IQR 0.91–0.97) over 3,907 real median beats, fitted by gradient descent through the simulator.
 * Electrode model: analytic thin-strip error 2×10⁻⁴, reciprocity 10⁻¹⁰, grid convergence 7×10⁻⁵; wet 21.5 kΩ vs dry 443 kΩ at 10 Hz.
+* Independent check: a separate P1 finite-element solver agrees with the finite-volume solver to **0.46 % max / 0.10 % mean** in |Z| from 1 Hz to 10 kHz, with phase within 0.14° and the same 11.9 % rise at 20 % lift-off ([`fem_crosscheck.json`](outputs/sensing_gen/fem_crosscheck.json)).
 * Null result: multiphysics-derived sensor priors did not improve the classifier (0.801 vs 0.818 at 0 dB).
 
 <!-- COMSOL-CHECK:BEGIN -->
