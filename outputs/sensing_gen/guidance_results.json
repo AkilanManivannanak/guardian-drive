@@ -1,0 +1,354 @@
+{
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.9.1",
+    "device": "mps",
+    "machine": "arm64",
+    "platform": "macOS-27.2-arm64-arm-64bit",
+    "time": "2026-11-03 03:14:26"
+  },
+  "sweep_on_validation": {
+    "diff_full": {
+      "trailing/static/w=0": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 0.0,
+        "saturated_fraction": 0.37666666666666665,
+        "frechet_ecg_distance": 170.9182245161292,
+        "log_spectral_distance_db": 18.75407600402832,
+        "seconds": 43.0
+      },
+      "trailing/static/w=1": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 1.0,
+        "saturated_fraction": 0.36333333333333334,
+        "frechet_ecg_distance": 97.69397977944561,
+        "log_spectral_distance_db": 11.233846664428711,
+        "seconds": 85.2
+      },
+      "trailing/static/w=2": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 2.0,
+        "saturated_fraction": 0.4,
+        "frechet_ecg_distance": 49.425688537218505,
+        "log_spectral_distance_db": 5.817798614501953,
+        "seconds": 82.0
+      },
+      "leading/static/w=0": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 0.0,
+        "saturated_fraction": 0.0,
+        "frechet_ecg_distance": 1.6140201468075603,
+        "log_spectral_distance_db": 0.37992510199546814,
+        "seconds": 42.4
+      },
+      "leading/static/w=1": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 1.0,
+        "saturated_fraction": 0.01,
+        "frechet_ecg_distance": 0.9639415182791171,
+        "log_spectral_distance_db": 1.0028561353683472,
+        "seconds": 80.1
+      },
+      "leading/static/w=2": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 2.0,
+        "saturated_fraction": 0.023333333333333334,
+        "frechet_ecg_distance": 1.5210784578734047,
+        "log_spectral_distance_db": 1.7796094417572021,
+        "seconds": 79.7
+      },
+      "leading/dynamic/w=0": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 0.0,
+        "saturated_fraction": 0.0,
+        "frechet_ecg_distance": 1.7397208090247527,
+        "log_spectral_distance_db": 0.39272546768188477,
+        "seconds": 41.6
+      },
+      "leading/dynamic/w=1": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 1.0,
+        "saturated_fraction": 0.0033333333333333335,
+        "frechet_ecg_distance": 0.8370396447776461,
+        "log_spectral_distance_db": 0.5939857363700867,
+        "seconds": 80.5
+      },
+      "leading/dynamic/w=2": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 2.0,
+        "saturated_fraction": 0.02,
+        "frechet_ecg_distance": 1.300664268044017,
+        "log_spectral_distance_db": 1.2564018964767456,
+        "seconds": 79.7
+      }
+    },
+    "diff_simpre_low10": {
+      "trailing/static/w=0": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 0.0,
+        "saturated_fraction": 0.2,
+        "frechet_ecg_distance": 135.78294135622082,
+        "log_spectral_distance_db": 18.289215087890625,
+        "seconds": 40.8
+      },
+      "trailing/static/w=1": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 1.0,
+        "saturated_fraction": 0.22333333333333333,
+        "frechet_ecg_distance": 66.23000609737667,
+        "log_spectral_distance_db": 9.260924339294434,
+        "seconds": 79.9
+      },
+      "trailing/static/w=2": {
+        "spacing": "trailing",
+        "threshold": "static",
+        "w": 2.0,
+        "saturated_fraction": 0.24666666666666667,
+        "frechet_ecg_distance": 29.118776816314917,
+        "log_spectral_distance_db": 3.328282117843628,
+        "seconds": 79.9
+      },
+      "leading/static/w=0": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 0.0,
+        "saturated_fraction": 0.0,
+        "frechet_ecg_distance": 1.1836351432328787,
+        "log_spectral_distance_db": 2.022202491760254,
+        "seconds": 41.0
+      },
+      "leading/static/w=1": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 1.0,
+        "saturated_fraction": 0.0033333333333333335,
+        "frechet_ecg_distance": 2.737038347091402,
+        "log_spectral_distance_db": 0.35910147428512573,
+        "seconds": 80.3
+      },
+      "leading/static/w=2": {
+        "spacing": "leading",
+        "threshold": "static",
+        "w": 2.0,
+        "saturated_fraction": 0.016666666666666666,
+        "frechet_ecg_distance": 4.043191465959268,
+        "log_spectral_distance_db": 1.062930703163147,
+        "seconds": 79.5
+      },
+      "leading/dynamic/w=0": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 0.0,
+        "saturated_fraction": 0.0,
+        "frechet_ecg_distance": 1.2254172030419093,
+        "log_spectral_distance_db": 2.2682080268859863,
+        "seconds": 42.6
+      },
+      "leading/dynamic/w=1": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 1.0,
+        "saturated_fraction": 0.0,
+        "frechet_ecg_distance": 2.405199785566939,
+        "log_spectral_distance_db": 0.7669251561164856,
+        "seconds": 80.4
+      },
+      "leading/dynamic/w=2": {
+        "spacing": "leading",
+        "threshold": "dynamic",
+        "w": 2.0,
+        "saturated_fraction": 0.006666666666666667,
+        "frechet_ecg_distance": 3.594346547944376,
+        "log_spectral_distance_db": 0.752174437046051,
+        "seconds": 82.9
+      }
+    }
+  },
+  "selected_w": {
+    "diff_full": {
+      "spacing": "leading",
+      "threshold": "dynamic",
+      "w": 1.0
+    },
+    "diff_simpre_low10": {
+      "spacing": "leading",
+      "threshold": "static",
+      "w": 0.0
+    }
+  },
+  "final_on_test": {
+    "diff_full": {
+      "w": 1.0,
+      "sampler": "leading/dynamic",
+      "n": 2000,
+      "saturated_fraction": 0.0055,
+      "frechet_ecg_distance": 1.2812995199274972,
+      "mmd2_embedding": 0.0049177388014287615,
+      "log_spectral_distance_db": 0.3426119387149811,
+      "discriminative_score": 0.125,
+      "discriminator_accuracy": 0.625,
+      "tstr_auroc": 0.8292285819115759
+    },
+    "diff_simpre_low10": {
+      "w": 0.0,
+      "sampler": "leading/static",
+      "n": 2000,
+      "saturated_fraction": 0.002,
+      "frechet_ecg_distance": 2.007751218031964,
+      "mmd2_embedding": 0.006377742943802001,
+      "log_spectral_distance_db": 2.342514991760254,
+      "discriminative_score": 0.21114864864864868,
+      "discriminator_accuracy": 0.7111486486486487,
+      "tstr_auroc": 0.824837185837461
+    }
+  },
+  "downstream": {
+    "10pct_real": {
+      "real+sim_pretrained_diffusion(w_sel)": {
+        "auroc": {
+          "clean": {
+            "mean": 0.8235224423653152,
+            "std": 0.007961832470499483
+          },
+          "nstdb_6dB": {
+            "mean": 0.8018635724331927,
+            "std": 0.002215723402111358
+          },
+          "nstdb_0dB": {
+            "mean": 0.7497592184920198,
+            "std": 0.010087472365770695
+          }
+        },
+        "runs": [
+          {
+            "clean": 0.8122706842781141,
+            "nstdb_6dB": 0.7990391671252981,
+            "nstdb_0dB": 0.7498394789946798
+          },
+          {
+            "clean": 0.8287814162538983,
+            "nstdb_6dB": 0.8021005320124748,
+            "nstdb_0dB": 0.7373647037240874
+          },
+          {
+            "clean": 0.8295152265639332,
+            "nstdb_6dB": 0.8044510181618052,
+            "nstdb_0dB": 0.7620734727572922
+          }
+        ]
+      },
+      "real+sim_pretrained_diffusion(w_sel)+sensor_model_aug": {
+        "auroc": {
+          "clean": {
+            "mean": 0.8073900813306426,
+            "std": 0.00197974615365149
+          },
+          "nstdb_6dB": {
+            "mean": 0.8061594202898551,
+            "std": 0.00428107794776556
+          },
+          "nstdb_0dB": {
+            "mean": 0.7842750565645448,
+            "std": 0.00943193309171819
+          }
+        },
+        "runs": [
+          {
+            "clean": 0.8097482113373693,
+            "nstdb_6dB": 0.8077245000917262,
+            "nstdb_0dB": 0.791987708677307
+          },
+          {
+            "clean": 0.8075181159420289,
+            "nstdb_6dB": 0.8104418913960741,
+            "nstdb_0dB": 0.7898436066776738
+          },
+          {
+            "clean": 0.8049039167125298,
+            "nstdb_6dB": 0.8003118693817648,
+            "nstdb_0dB": 0.7709938543386534
+          }
+        ]
+      }
+    },
+    "100pct_real": {
+      "real+diffusion(w_sel)": {
+        "auroc": {
+          "clean": {
+            "mean": 0.8341474041460283,
+            "std": 0.007227945220420622
+          },
+          "nstdb_6dB": {
+            "mean": 0.811219653886137,
+            "std": 0.014109820571717268
+          },
+          "nstdb_0dB": {
+            "mean": 0.7449474102611142,
+            "std": 0.028315849769610896
+          }
+        },
+        "runs": [
+          {
+            "clean": 0.838068702990277,
+            "nstdb_6dB": 0.8212139974316639,
+            "nstdb_0dB": 0.7730462300495322
+          },
+          {
+            "clean": 0.840361860209136,
+            "nstdb_6dB": 0.821179600073381,
+            "nstdb_0dB": 0.7556067694001101
+          },
+          {
+            "clean": 0.8240116492386718,
+            "nstdb_6dB": 0.7912653641533663,
+            "nstdb_0dB": 0.7061892313337003
+          }
+        ]
+      },
+      "real+diffusion(w_sel)+sensor_model_aug": {
+        "auroc": {
+          "clean": {
+            "mean": 0.837877606555372,
+            "std": 0.0010814505023531897
+          },
+          "nstdb_6dB": {
+            "mean": 0.8344416926557817,
+            "std": 0.0032148441256203376
+          },
+          "nstdb_0dB": {
+            "mean": 0.8270691921971504,
+            "std": 0.003137805788743573
+          }
+        },
+        "runs": [
+          {
+            "clean": 0.8382521555677858,
+            "nstdb_6dB": 0.8339639515685195,
+            "nstdb_0dB": 0.8280132085855806
+          },
+          {
+            "clean": 0.8364061640066043,
+            "nstdb_6dB": 0.8307649972482113,
+            "nstdb_0dB": 0.8228421390570537
+          },
+          {
+            "clean": 0.8389745000917262,
+            "nstdb_6dB": 0.8385961291506145,
+            "nstdb_0dB": 0.8303522289488168
+          }
+        ]
+      }
+    }
+  }
+}

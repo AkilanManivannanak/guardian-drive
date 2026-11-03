@@ -41,6 +41,38 @@ class PolicyDecision:
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
 
+    # Compatibility with the PolicyAction interface used by the replay / evaluation code.
+    @property
+    def level(self):
+        from acquisition.models import AlertLevel
+        return AlertLevel(_STATE_TO_LEVEL.get(self.state, 1))
+
+    @property
+    def log_reason(self) -> str:
+        return "; ".join(self.reasons) if self.reasons else self.summary
+
+
+_STATE_TO_LEVEL = {"nominal": 1, "advisory": 2, "caution": 3, "pull_over": 4, "escalate": 5}
+
+
+def _risk_state_to_tasks(rs: object) -> Dict[str, object]:
+    """Adapter: FusionEngine's RiskState dataclass -> the task mapping consumed by step()."""
+    out: Dict[str, object] = {}
+    arr = getattr(rs, "arrhythmia", None)
+    if arr is not None and not getattr(arr, "abstained", False):
+        cls = getattr(getattr(arr, "cls", None), "value", "")
+        if cls in ("afib", "tachycardia", "bradycardia"):
+            out["task_a"] = {"score": float(arr.confidence), "details": {"class": cls}}
+    drw = getattr(rs, "drowsiness", None)
+    if drw is not None and not getattr(drw, "abstained", False):
+        out["task_b"] = {"score": float(drw.score), "details": dict(getattr(drw, "details", {}) or {})}
+    cr = getattr(rs, "crash", None)
+    if cr is not None and getattr(cr, "detected", False):
+        sev = getattr(getattr(cr, "severity", None), "name", "NONE")
+        factor = 1.0 if sev == "SEVERE" else 0.6  # a mild crash alone is not an emergency
+        out["task_c"] = {"score": float(cr.confidence) * factor, "details": {"severity": sev}}
+    return out
+
 
 class SafetyStateMachine:
     """
@@ -95,8 +127,10 @@ class SafetyStateMachine:
             return True
         return False
 
-    def step(self, rs: Mapping[str, object]) -> PolicyDecision:
+    def step(self, rs: object) -> PolicyDecision:
         now = time.time()
+        if not isinstance(rs, Mapping):
+            rs = _risk_state_to_tasks(rs)
         task_a = rs.get("task_a")
         task_b = rs.get("task_b")
         task_c = rs.get("task_c")

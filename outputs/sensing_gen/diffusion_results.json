@@ -1,0 +1,276 @@
+{
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.9.1",
+    "device": "mps",
+    "machine": "arm64",
+    "platform": "macOS-27.2-arm64-arm-64bit",
+    "time": "2026-11-02 22:33:31"
+  },
+  "train_logs": {
+    "diff_full": [
+      {
+        "step": 100,
+        "loss": 0.9407076611764051
+      },
+      {
+        "step": 500,
+        "loss": 0.12841875046333162
+      },
+      {
+        "step": 1000,
+        "loss": 0.10984003740119626
+      },
+      {
+        "step": 1500,
+        "loss": 0.10508455531026285
+      },
+      {
+        "step": 2000,
+        "loss": 0.10295308643326384
+      },
+      {
+        "step": 2500,
+        "loss": 0.10090685135369791
+      },
+      {
+        "step": 3000,
+        "loss": 0.10080210715526841
+      },
+      {
+        "step": 3500,
+        "loss": 0.09849517247555263
+      },
+      {
+        "step": 4000,
+        "loss": 0.09893504650167341
+      },
+      {
+        "step": 4500,
+        "loss": 0.0993523458082686
+      },
+      {
+        "step": 5000,
+        "loss": 0.09908466591429799
+      },
+      {
+        "step": 5500,
+        "loss": 0.097750707026832
+      },
+      {
+        "step": 6000,
+        "loss": 0.09251449208204396
+      },
+      {
+        "step": 6500,
+        "loss": 0.09975145950371103
+      },
+      {
+        "step": 7000,
+        "loss": 0.09630038591776759
+      },
+      {
+        "step": 7500,
+        "loss": 0.09777361631879532
+      },
+      {
+        "step": 8000,
+        "loss": 0.09510918488258133
+      }
+    ],
+    "diff_low10": [
+      {
+        "step": 100,
+        "loss": 0.9403015670537004
+      },
+      {
+        "step": 500,
+        "loss": 0.1264887371446574
+      },
+      {
+        "step": 1000,
+        "loss": 0.10406796064525796
+      },
+      {
+        "step": 1500,
+        "loss": 0.09957412767773505
+      },
+      {
+        "step": 2000,
+        "loss": 0.09361907710137349
+      },
+      {
+        "step": 2500,
+        "loss": 0.09291272019650129
+      },
+      {
+        "step": 3000,
+        "loss": 0.08755502276837453
+      },
+      {
+        "step": 3500,
+        "loss": 0.08500336997139836
+      },
+      {
+        "step": 4000,
+        "loss": 0.08318938382972868
+      }
+    ],
+    "sim_pretrain": [
+      {
+        "step": 100,
+        "loss": 0.9372617290700799
+      },
+      {
+        "step": 500,
+        "loss": 0.07333823528723596
+      },
+      {
+        "step": 1000,
+        "loss": 0.051042825417468206
+      },
+      {
+        "step": 1500,
+        "loss": 0.04516382023917296
+      },
+      {
+        "step": 2000,
+        "loss": 0.04258871180254398
+      },
+      {
+        "step": 2500,
+        "loss": 0.04117266234110808
+      },
+      {
+        "step": 3000,
+        "loss": 0.03888233139890391
+      },
+      {
+        "step": 3500,
+        "loss": 0.03763807376127642
+      },
+      {
+        "step": 4000,
+        "loss": 0.036370108522054696
+      }
+    ],
+    "diff_simpre_low10": [
+      {
+        "step": 100,
+        "loss": 0.12837045382587114
+      },
+      {
+        "step": 500,
+        "loss": 0.09960337293675094
+      },
+      {
+        "step": 1000,
+        "loss": 0.0924603946323529
+      },
+      {
+        "step": 1500,
+        "loss": 0.09191864680538334
+      },
+      {
+        "step": 2000,
+        "loss": 0.08756795651632011
+      },
+      {
+        "step": 2500,
+        "loss": 0.0877968177524616
+      },
+      {
+        "step": 3000,
+        "loss": 0.0836450418408914
+      },
+      {
+        "step": 3500,
+        "loss": 0.08170919610600709
+      },
+      {
+        "step": 4000,
+        "loss": 0.08092551042904812
+      }
+    ]
+  },
+  "fidelity_vs_real_test": {
+    "real_train_split": {
+      "frechet_ecg_distance": 4.373063367805008,
+      "mmd2_embedding": 0.06370946388421239,
+      "log_spectral_distance_db": 0.20245353877544403,
+      "hr_wasserstein_bpm": 1.7701278028494158,
+      "discriminative_score": 0.0016891891891891997,
+      "discriminator_accuracy": 0.4983108108108108,
+      "tstr_auroc": 0.8017565584296459
+    },
+    "diff_full": {
+      "frechet_ecg_distance": 72.8772467306593,
+      "mmd2_embedding": 0.14884256632448445,
+      "log_spectral_distance_db": 5.443660736083984,
+      "hr_wasserstein_bpm": 7.777141476806304,
+      "discriminative_score": 0.45608108108108103,
+      "discriminator_accuracy": 0.956081081081081,
+      "tstr_auroc": 0.8194024032287653
+    },
+    "diff_low10": {
+      "frechet_ecg_distance": 107.24590317598602,
+      "mmd2_embedding": 0.21012684441240093,
+      "log_spectral_distance_db": 1.7993175983428955,
+      "hr_wasserstein_bpm": 8.034178407706271,
+      "discriminative_score": 0.42567567567567566,
+      "discriminator_accuracy": 0.9256756756756757,
+      "tstr_auroc": 0.8116171344707394
+    },
+    "diff_simpre_low10": {
+      "frechet_ecg_distance": 43.22591681784339,
+      "mmd2_embedding": 0.08575215961393778,
+      "log_spectral_distance_db": 3.1887080669403076,
+      "hr_wasserstein_bpm": 5.227578103844071,
+      "discriminative_score": 0.36317567567567566,
+      "discriminator_accuracy": 0.8631756756756757,
+      "tstr_auroc": 0.8076958356264905
+    },
+    "sim_low10": {
+      "frechet_ecg_distance": 6.107848028488993,
+      "mmd2_embedding": 0.02137283581480276,
+      "log_spectral_distance_db": 9.271498680114746,
+      "hr_wasserstein_bpm": 0.7725408944920864,
+      "discriminative_score": 0.464527027027027,
+      "discriminator_accuracy": 0.964527027027027,
+      "tstr_auroc": 0.7964478994679876
+    },
+    "sim_full": {
+      "frechet_ecg_distance": 6.615714853868036,
+      "mmd2_embedding": 0.02619924970253429,
+      "log_spectral_distance_db": 8.796260833740234,
+      "hr_wasserstein_bpm": 1.285551772794625,
+      "discriminative_score": 0.45270270270270274,
+      "discriminator_accuracy": 0.9527027027027027,
+      "tstr_auroc": 0.8080742065676023
+    }
+  },
+  "trtr_auroc_reference": 0.8012635296275913,
+  "hr_control": {
+    "requested_bpm": [
+      50,
+      70,
+      90,
+      110
+    ],
+    "measured_mean_bpm": [
+      57.08378601074219,
+      77.94644927978516,
+      95.40306091308594,
+      109.96900939941406
+    ],
+    "mae_bpm": 9.60988712310791,
+    "detectable_fraction": 0.94
+  },
+  "timings": {
+    "simulate_pretrain_set_s": 2.5,
+    "train_full_s": 3725.0,
+    "sample_diff_full_s": 992.3,
+    "sample_diff_low10_s": 1014.9,
+    "sample_diff_simpre_low10_s": 1036.4
+  }
+}

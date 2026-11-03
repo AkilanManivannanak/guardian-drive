@@ -55,3 +55,21 @@ data/
 !data/argoverse2/av2_val_manifest.json
 runs/
 outputs/*.pt
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+
+# sensing_gen: large / regenerable artifacts (JSON results, figures and RESULTS.md are tracked)
+outputs/sensing_gen/*.pt
+outputs/sensing_gen/*.npz
+outputs/sensing_gen/*.npy
+outputs/sensing_gen/_bundle.tar.gz
+outputs/sensing_gen/smoke/
+outputs/sensing_gen/logs/
+state_machine.py.new
+
+# keep the sensing_gen data-loading package (the rule "data/" above matches any directory named data)
+!sensing_gen/data/
