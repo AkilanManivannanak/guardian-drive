@@ -1,6 +1,6 @@
 # sensing_gen: simulation and generative models for wearable physiological signals
 
-**[Interactive results explorer →](https://akilalours.github.io/guardian-drive/explorer.html)** · [technical report (PDF)](../docs/sensing_gen_report.pdf)
+**[Interactive results explorer →](https://akilalours.github.io/guardian-drive/docs/explorer.html)** · [technical report (PDF)](../docs/sensing_gen_report.pdf)
 
 The question this module answers: **can physics-based simulation and generative models give a
 wearable-ECG model more, and harder, training data than real-world collection alone, and can we

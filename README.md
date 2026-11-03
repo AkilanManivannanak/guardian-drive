@@ -24,7 +24,7 @@
 ## 60-second tour
 
 <p align="center">
-  <a href="https://akilalours.github.io/guardian-drive/explorer.html"><b>Open the interactive results explorer →</b></a><br>
+  <a href="https://akilalours.github.io/guardian-drive/docs/explorer.html"><b>Open the interactive results explorer →</b></a><br>
   <sub>Toggle noise levels, compare samplers, drag an electrode off the skin, and draw random generated ECG. Every number comes from a result file in this repo.</sub>
 </p>
 
@@ -37,7 +37,7 @@
 
 | If you have… | Start here |
 |---|---|
-| 1 minute | the [interactive explorer](https://akilalours.github.io/guardian-drive/explorer.html) and the two animations below |
+| 1 minute | the [interactive explorer](https://akilalours.github.io/guardian-drive/docs/explorer.html) and the two animations below |
 | 5 minutes | [Headline results](#headline-results) and the expandable experiment cards |
 | 15 minutes | the [4-page technical report](docs/sensing_gen_report.pdf) |
 | an afternoon | `bash scripts/run_sensing_gen.sh` reproduces everything on a laptop |
