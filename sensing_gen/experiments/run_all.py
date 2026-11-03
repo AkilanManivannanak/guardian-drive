@@ -13,7 +13,7 @@ import importlib
 
 from .common import get_profile, out_dir
 
-STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance"]
+STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving"]
 
 
 def fmt(m):
@@ -116,6 +116,23 @@ def write_report(od):
                 for k, v in cfgs.items():
                     a = v["auroc"]
                     L.append(f"| {reg} | {k} | {fmt(a['clean'])} | {fmt(a['nstdb_6dB'])} | {fmt(a['nstdb_0dB'])} |")
+        L.append("")
+    p = od / "driving_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Real in-car ECG (PhysioNet drivedb): false cardiac alarms at 90 % validation specificity", "",
+              f"{d['n_records']} drives, {d['n_windows']} ten-second windows "
+              f"({d['frac_windows_detectable_beats']:.2f} with detectable beats).", "",
+              "| training | PTB-XL NORM false alarms | in-car, all | in-car, first 10 min | in-car, driving | PTB-XL AUROC |",
+              "|---|---|---|---|---|---|"]
+        for k, v in d["results"].items():
+            s_ = v["summary"]
+            rest = fmt(s_["drive_false_alarm_rest"]) if "drive_false_alarm_rest" in s_ else "–"
+            L.append(f"| {k} | {fmt(s_['ptbxl_test_norm_false_alarm'])} | {fmt(s_['drive_false_alarm_all'])} | "
+                     f"{rest} | {fmt(s_['drive_false_alarm_driving'])} | {fmt(s_['ptbxl_test_auroc'])} |")
+        for k, v in d.get("bootstrap_vs_real", {}).items():
+            L.append(f"\n{k}: change in in-car false alarms vs real-only {v['delta_false_alarm']:+.3f} "
+                     f"(95 % driver-bootstrap CI {v['ci95'][0]:+.3f} to {v['ci95'][1]:+.3f})")
         L.append("")
     (od / "RESULTS.md").write_text("\n".join(L))
     print("\n".join(L))

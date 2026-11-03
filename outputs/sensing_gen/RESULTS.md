@@ -99,3 +99,20 @@ HR control MAE: 9.61 bpm (measured 57.1, 77.9, 95.4, 110.0 for requested 50/70/9
 | 10pct_real | real+sim_pretrained_diffusion(w_sel)+sensor_model_aug | 0.807 ± 0.002 | 0.806 ± 0.004 | 0.784 ± 0.009 |
 | 100pct_real | real+diffusion(w_sel) | 0.834 ± 0.007 | 0.811 ± 0.014 | 0.745 ± 0.028 |
 | 100pct_real | real+diffusion(w_sel)+sensor_model_aug | 0.838 ± 0.001 | 0.834 ± 0.003 | 0.827 ± 0.003 |
+
+## Real in-car ECG (PhysioNet drivedb): false cardiac alarms at 90 % validation specificity
+
+18 drives, 7995 ten-second windows (1.00 with detectable beats).
+
+| training | PTB-XL NORM false alarms | in-car, all | in-car, first 10 min | in-car, driving | PTB-XL AUROC |
+|---|---|---|---|---|---|
+| real | 0.124 ± 0.017 | 0.139 ± 0.013 | 0.122 ± 0.015 | 0.141 ± 0.013 | 0.812 ± 0.009 |
+| real+sensor_model_aug | 0.110 ± 0.007 | 0.153 ± 0.009 | 0.124 ± 0.001 | 0.158 ± 0.010 | 0.833 ± 0.004 |
+| real+nstdb_noise_aug(reference) | 0.094 ± 0.011 | 0.161 ± 0.013 | 0.137 ± 0.015 | 0.165 ± 0.013 | 0.823 ± 0.009 |
+| real+diffusion(fixed)+sensor_model_aug | 0.103 ± 0.016 | 0.173 ± 0.002 | 0.146 ± 0.002 | 0.177 ± 0.002 | 0.838 ± 0.001 |
+
+real+sensor_model_aug: change in in-car false alarms vs real-only +0.015 (95 % driver-bootstrap CI -0.006 to +0.041)
+
+real+nstdb_noise_aug(reference): change in in-car false alarms vs real-only +0.022 (95 % driver-bootstrap CI -0.007 to +0.062)
+
+real+diffusion(fixed)+sensor_model_aug: change in in-car false alarms vs real-only +0.035 (95 % driver-bootstrap CI -0.013 to +0.111)

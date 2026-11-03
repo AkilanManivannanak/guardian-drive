@@ -1,0 +1,453 @@
+{
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.9.1",
+    "device": "mps",
+    "machine": "arm64",
+    "platform": "macOS-27.2-arm64-arm-64bit",
+    "time": "2026-11-03 04:27:26"
+  },
+  "n_records": 18,
+  "n_windows": 7995,
+  "n_windows_rest": 1080,
+  "frac_windows_detectable_beats": 0.9989993746091307,
+  "records": [
+    {
+      "record": "drive01",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 396
+    },
+    {
+      "record": "drive02",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 503
+    },
+    {
+      "record": "drive03",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 556
+    },
+    {
+      "record": "drive04",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 492
+    },
+    {
+      "record": "drive05",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 505
+    },
+    {
+      "record": "drive06",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 484
+    },
+    {
+      "record": "drive07",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 531
+    },
+    {
+      "record": "drive08",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 487
+    },
+    {
+      "record": "drive09",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 425
+    },
+    {
+      "record": "drive10",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 487
+    },
+    {
+      "record": "drive11",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 487
+    },
+    {
+      "record": "drive12",
+      "ecg_channel": "ECG",
+      "fs": 356.5,
+      "n_windows": 498
+    },
+    {
+      "record": "drive13",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 482
+    },
+    {
+      "record": "drive14",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 482
+    },
+    {
+      "record": "drive15",
+      "ecg_channel": "ECG",
+      "fs": 480.5,
+      "n_windows": 465
+    },
+    {
+      "record": "drive16",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 389
+    },
+    {
+      "record": "drive17a",
+      "ecg_channel": "ECG",
+      "fs": 480.0,
+      "n_windows": 174
+    },
+    {
+      "record": "drive17b",
+      "ecg_channel": "ECG",
+      "fs": 496.0,
+      "n_windows": 152
+    }
+  ],
+  "results": {
+    "real": {
+      "summary": {
+        "threshold": {
+          "mean": 0.8797283331553141,
+          "std": 0.01715758070353048
+        },
+        "ptbxl_test_auroc": {
+          "mean": 0.8119974163762,
+          "std": 0.009064072353961516
+        },
+        "ptbxl_test_norm_false_alarm": {
+          "mean": 0.12439613526570048,
+          "std": 0.01682172497244458
+        },
+        "drive_false_alarm_all": {
+          "mean": 0.13867000208463623,
+          "std": 0.012857052048765345
+        },
+        "drive_false_alarm_rest": {
+          "mean": 0.12222222222222223,
+          "std": 0.015101394842870458
+        },
+        "drive_false_alarm_driving": {
+          "mean": 0.14123885273559894,
+          "std": 0.012532955112928679
+        },
+        "drive_false_alarm_detectable_only": {
+          "mean": 0.13847502191060476,
+          "std": 0.01283238714558018
+        },
+        "drive_false_alarm_median_per_driver": {
+          "mean": 0.016139809152333918,
+          "std": 0.01695703092940588
+        },
+        "drive_mean_abnormal_prob": {
+          "mean": 0.18097712596257529,
+          "std": 0.044624118387045116
+        }
+      },
+      "runs": [
+        {
+          "threshold": 0.8989493012428283,
+          "ptbxl_test_auroc": 0.8012635296275913,
+          "ptbxl_test_norm_false_alarm": 0.14130434782608695,
+          "drive_false_alarm_all": 0.1565978736710444,
+          "drive_false_alarm_rest": 0.1425925925925926,
+          "drive_false_alarm_driving": 0.15878524945770064,
+          "drive_false_alarm_detectable_only": 0.15637911606360336,
+          "drive_false_alarm_median_per_driver": 0.04012067227027976,
+          "drive_mean_abnormal_prob": 0.24391546845436096
+        },
+        {
+          "threshold": 0.8829432010650635,
+          "ptbxl_test_auroc": 0.8234326270409099,
+          "ptbxl_test_norm_false_alarm": 0.10144927536231885,
+          "drive_false_alarm_all": 0.13233270794246405,
+          "drive_false_alarm_rest": 0.1175925925925926,
+          "drive_false_alarm_driving": 0.13463485177151122,
+          "drive_false_alarm_detectable_only": 0.1320896456742206,
+          "drive_false_alarm_median_per_driver": 0.004149377593360996,
+          "drive_mean_abnormal_prob": 0.15351316332817078
+        },
+        {
+          "threshold": 0.8572924971580506,
+          "ptbxl_test_auroc": 0.811296092460099,
+          "ptbxl_test_norm_false_alarm": 0.13043478260869565,
+          "drive_false_alarm_all": 0.12707942464040026,
+          "drive_false_alarm_rest": 0.10648148148148148,
+          "drive_false_alarm_driving": 0.13029645697758496,
+          "drive_false_alarm_detectable_only": 0.12695630399399024,
+          "drive_false_alarm_median_per_driver": 0.004149377593360996,
+          "drive_mean_abnormal_prob": 0.1455027461051941
+        }
+      ],
+      "seconds": 95.3
+    },
+    "real+sensor_model_aug": {
+      "summary": {
+        "threshold": {
+          "mean": 0.4820179720719657,
+          "std": 0.24551898109522685
+        },
+        "ptbxl_test_auroc": {
+          "mean": 0.8326797835259585,
+          "std": 0.004154234317972003
+        },
+        "ptbxl_test_norm_false_alarm": {
+          "mean": 0.10990338164251208,
+          "std": 0.007444944448030164
+        },
+        "drive_false_alarm_all": {
+          "mean": 0.15330414842609963,
+          "std": 0.00910716469148549
+        },
+        "drive_false_alarm_rest": {
+          "mean": 0.12438271604938271,
+          "std": 0.0011548325267820762
+        },
+        "drive_false_alarm_driving": {
+          "mean": 0.15782116172571706,
+          "std": 0.010349247177063921
+        },
+        "drive_false_alarm_detectable_only": {
+          "mean": 0.15299862276198822,
+          "std": 0.009144139044201933
+        },
+        "drive_false_alarm_median_per_driver": {
+          "mean": 0.011403222329745758,
+          "std": 0.0066001216771327
+        },
+        "drive_mean_abnormal_prob": {
+          "mean": 0.2529100279013316,
+          "std": 0.11764051119727499
+        }
+      },
+      "runs": [
+        {
+          "threshold": 0.29199928641319284,
+          "ptbxl_test_auroc": 0.8328747018895616,
+          "ptbxl_test_norm_false_alarm": 0.11956521739130435,
+          "drive_false_alarm_all": 0.14333958724202628,
+          "drive_false_alarm_rest": 0.12314814814814815,
+          "drive_false_alarm_driving": 0.14649313087490962,
+          "drive_false_alarm_detectable_only": 0.14285714285714285,
+          "drive_false_alarm_median_per_driver": 0.015791344530347463,
+          "drive_mean_abnormal_prob": 0.17075951397418976
+        },
+        {
+          "threshold": 0.32535485029220584,
+          "ptbxl_test_auroc": 0.8274972482113374,
+          "ptbxl_test_norm_false_alarm": 0.10144927536231885,
+          "drive_false_alarm_all": 0.15121951219512195,
+          "drive_false_alarm_rest": 0.12407407407407407,
+          "drive_false_alarm_driving": 0.1554591467823572,
+          "drive_false_alarm_detectable_only": 0.1511205709277576,
+          "drive_false_alarm_median_per_driver": 0.002074688796680498,
+          "drive_mean_abnormal_prob": 0.16869600117206573
+        },
+        {
+          "threshold": 0.8286997795104981,
+          "ptbxl_test_auroc": 0.8376674004769767,
+          "ptbxl_test_norm_false_alarm": 0.10869565217391304,
+          "drive_false_alarm_all": 0.16535334584115072,
+          "drive_false_alarm_rest": 0.1259259259259259,
+          "drive_false_alarm_driving": 0.1715112075198843,
+          "drive_false_alarm_detectable_only": 0.16501815450106422,
+          "drive_false_alarm_median_per_driver": 0.01634363366220931,
+          "drive_mean_abnormal_prob": 0.41927456855773926
+        }
+      ],
+      "seconds": 121.9
+    },
+    "real+nstdb_noise_aug(reference)": {
+      "summary": {
+        "threshold": {
+          "mean": 0.6655574589967728,
+          "std": 0.3091228181404701
+        },
+        "ptbxl_test_auroc": {
+          "mean": 0.8233447226808538,
+          "std": 0.008693975097297711
+        },
+        "ptbxl_test_norm_false_alarm": {
+          "mean": 0.09420289855072463,
+          "std": 0.010666377857883875
+        },
+        "drive_false_alarm_all": {
+          "mean": 0.16110068792995622,
+          "std": 0.012864621063704746
+        },
+        "drive_false_alarm_rest": {
+          "mean": 0.13734567901234565,
+          "std": 0.015499851270974968
+        },
+        "drive_false_alarm_driving": {
+          "mean": 0.16481079778259822,
+          "std": 0.01270640565787795
+        },
+        "drive_false_alarm_detectable_only": {
+          "mean": 0.16088644046575684,
+          "std": 0.012900614762383656
+        },
+        "drive_false_alarm_median_per_driver": {
+          "mean": 0.012618513024995488,
+          "std": 0.007160501902277818
+        },
+        "drive_mean_abnormal_prob": {
+          "mean": 0.29773562649885815,
+          "std": 0.14752301463873746
+        }
+      },
+      "runs": [
+        {
+          "threshold": 0.8657669544219971,
+          "ptbxl_test_auroc": 0.8118980462300496,
+          "ptbxl_test_norm_false_alarm": 0.09057971014492754,
+          "drive_false_alarm_all": 0.1778611632270169,
+          "drive_false_alarm_rest": 0.15925925925925927,
+          "drive_false_alarm_driving": 0.18076644974692696,
+          "drive_false_alarm_detectable_only": 0.17778890697383248,
+          "drive_false_alarm_median_per_driver": 0.022710223409991327,
+          "drive_mean_abnormal_prob": 0.2433975785970688
+        },
+        {
+          "threshold": 0.22889291942119602,
+          "ptbxl_test_auroc": 0.8251811594202898,
+          "ptbxl_test_norm_false_alarm": 0.08333333333333333,
+          "drive_false_alarm_all": 0.14659161976235147,
+          "drive_false_alarm_rest": 0.12685185185185185,
+          "drive_false_alarm_driving": 0.14967462039045554,
+          "drive_false_alarm_detectable_only": 0.14648804306998872,
+          "drive_false_alarm_median_per_driver": 0.008298755186721992,
+          "drive_mean_abnormal_prob": 0.15046241879463196
+        },
+        {
+          "threshold": 0.9020125031471252,
+          "ptbxl_test_auroc": 0.8329549623922217,
+          "ptbxl_test_norm_false_alarm": 0.10869565217391304,
+          "drive_false_alarm_all": 0.15884928080050031,
+          "drive_false_alarm_rest": 0.1259259259259259,
+          "drive_false_alarm_driving": 0.16399132321041215,
+          "drive_false_alarm_detectable_only": 0.15838237135344935,
+          "drive_false_alarm_median_per_driver": 0.006846560478273143,
+          "drive_mean_abnormal_prob": 0.49934688210487366
+        }
+      ],
+      "seconds": 111.2
+    },
+    "real+diffusion(fixed)+sensor_model_aug": {
+      "summary": {
+        "threshold": {
+          "mean": 0.6218959748744965,
+          "std": 0.32296100816294837
+        },
+        "ptbxl_test_auroc": {
+          "mean": 0.837877606555372,
+          "std": 0.0010814505023531897
+        },
+        "ptbxl_test_norm_false_alarm": {
+          "mean": 0.10265700483091787,
+          "std": 0.016293161308251262
+        },
+        "drive_false_alarm_all": {
+          "mean": 0.17327496351886595,
+          "std": 0.001889559173420838
+        },
+        "drive_false_alarm_rest": {
+          "mean": 0.14629629629629629,
+          "std": 0.0020002286106197086
+        },
+        "drive_false_alarm_driving": {
+          "mean": 0.17748855145818268,
+          "std": 0.002412146734769201
+        },
+        "drive_false_alarm_detectable_only": {
+          "mean": 0.17311464463085846,
+          "std": 0.001829665724868152
+        },
+        "drive_false_alarm_median_per_driver": {
+          "mean": 0.005331210594608798,
+          "std": 0.0038817778724869784
+        },
+        "drive_mean_abnormal_prob": {
+          "mean": 0.3255600333213806,
+          "std": 0.14363576280573961
+        }
+      },
+      "runs": [
+        {
+          "threshold": 0.9828086972236634,
+          "ptbxl_test_auroc": 0.8382521555677858,
+          "ptbxl_test_norm_false_alarm": 0.07971014492753623,
+          "drive_false_alarm_all": 0.17448405253283303,
+          "drive_false_alarm_rest": 0.14722222222222223,
+          "drive_false_alarm_driving": 0.1787418655097614,
+          "drive_false_alarm_detectable_only": 0.17440841367221735,
+          "drive_false_alarm_median_per_driver": 0.0012853470437017994,
+          "drive_mean_abnormal_prob": 0.5055884718894958
+        },
+        {
+          "threshold": 0.6838488221168518,
+          "ptbxl_test_auroc": 0.8364061640066043,
+          "ptbxl_test_norm_false_alarm": 0.11231884057971014,
+          "drive_false_alarm_all": 0.17473420888055036,
+          "drive_false_alarm_rest": 0.14351851851851852,
+          "drive_false_alarm_driving": 0.17960954446854663,
+          "drive_false_alarm_detectable_only": 0.17440841367221735,
+          "drive_false_alarm_median_per_driver": 0.010567480240964757,
+          "drive_mean_abnormal_prob": 0.31702691316604614
+        },
+        {
+          "threshold": 0.19903040528297428,
+          "ptbxl_test_auroc": 0.8389745000917262,
+          "ptbxl_test_norm_false_alarm": 0.11594202898550725,
+          "drive_false_alarm_all": 0.1706066291432145,
+          "drive_false_alarm_rest": 0.14814814814814814,
+          "drive_false_alarm_driving": 0.17411424439624007,
+          "drive_false_alarm_detectable_only": 0.17052710654814074,
+          "drive_false_alarm_median_per_driver": 0.004140804499159836,
+          "drive_mean_abnormal_prob": 0.15406471490859985
+        }
+      ],
+      "seconds": 122.3
+    }
+  },
+  "bootstrap_vs_real": {
+    "real+sensor_model_aug": {
+      "delta_false_alarm": 0.014634146341463428,
+      "ci95": [
+        -0.00575001886400263,
+        0.040975324624013446
+      ]
+    },
+    "real+nstdb_noise_aug(reference)": {
+      "delta_false_alarm": 0.022430685845319986,
+      "ci95": [
+        -0.006541181805229671,
+        0.06198556502034864
+      ]
+    },
+    "real+diffusion(fixed)+sensor_model_aug": {
+      "delta_false_alarm": 0.03460496143422975,
+      "ci95": [
+        -0.012830696985610995,
+        0.11074176727702126
+      ]
+    }
+  }
+}

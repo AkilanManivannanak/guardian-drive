@@ -233,3 +233,16 @@ def test_ddim_leading_dynamic_sampler_is_finite_and_bounded():
     y, hr = torch.tensor([0, 1]), torch.tensor([60.0, 90.0])
     s = d.ddim_sample(2, 1000, y, hr, steps=10, w=1.0, spacing="leading", threshold="dynamic")
     assert s.shape == (2, 1, 1000) and torch.isfinite(s).all() and s.abs().max() <= 12.0 + 1e-4
+
+
+def test_read_record_multi_frequency(tmp_path):
+    from sensing_gen.data.wfdb_io import read_record_multi
+    # signal A: 4 samples per frame, signal B: 1 sample per frame, 10 frames, format 16
+    a = np.arange(40, dtype=np.int16)
+    b = 1000 + np.arange(10, dtype=np.int16)
+    frames = np.concatenate([a.reshape(10, 4), b.reshape(10, 1)], axis=1).astype("<i2")
+    (tmp_path / "m.dat").write_bytes(frames.tobytes())
+    (tmp_path / "m.hea").write_text("m 2 15.5 10\nm.dat 16x4 1(0)/mV 16 0 0 0 0 ECG\nm.dat 16 1(0)/mV 16 0 0 0 0 RESP\n")
+    sigs, hdr = read_record_multi(tmp_path / "m")
+    assert np.array_equal(sigs["ECG"][0], a) and sigs["ECG"][1] == 62.0
+    assert np.array_equal(sigs["RESP"][0], b) and sigs["RESP"][1] == 15.5

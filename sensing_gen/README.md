@@ -120,7 +120,22 @@ so compare distances within a table, not across tables.
   It predicts 21.5 kΩ (gel) vs 443 kΩ (dry) at 10 Hz, near-zero pressure sensitivity for gel but κ ≈ 0.4 for dry electrodes, and lift-off sensitivity κ ≈ 0.6.
 * **Negative result.** Widening the sensor model's priors to the multiphysics range did *not* help (0 dB AUROC 0.801 ± 0.013 vs 0.818 ± 0.007). The augmentation benefit is robust to the exact priors.
 
-### 4. Inverse PINN: where physics helps and where it does not
+### 4. Real in-car ECG: a deployment check that came back null
+
+PhysioNet *drivedb* (Healey & Picard, 2005) contains ECG from 18 drives on real Boston roads: 7,995 ten-second windows. No diagnoses exist, so every abnormal output is counted as a **false cardiac alarm**. Thresholds are set to 90 % specificity on PTB-XL validation; nothing is tuned on driving data (`driving_results.json`, `fig_driving.png`).
+
+| training (3 seeds) | false alarms, PTB-XL NORM test | false alarms, in car (all) | in car, while driving |
+|---|---|---|---|
+| real only | 12.4 % | **13.9 %** | 14.1 % |
+| + physics sensor model | 11.0 % | 15.3 % | 15.8 % |
+| + real NSTDB noise (reference) | 9.4 % | 16.1 % | 16.5 % |
+| + diffusion (fixed) + sensor model | 10.3 % | 17.3 % | 17.7 % |
+
+* **The models transfer.** In-car false alarms (13.9 %) sit close to the clinical design rate (12.4 % on PTB-XL), even though drivedb uses a different chest-lead placement and an older recorder.
+* **The robustness gains do not show up here.** Every augmentation leaves in-car false alarms unchanged within noise; the driver-bootstrap 95 % CIs all include zero (sensor model +1.5 pp, CI −0.6 to +4.1). The drivedb ECG is clean (beats detectable in 99.9 % of windows), so the motion-artifact robustness measured on NSTDB has nothing to act on.
+* **False alarms come from a few drivers.** The median driver has a 0.5–1.6 % false-alarm rate against 14–17 % overall. That points to electrode placement and morphology shift, not noise, as the remaining sim-to-real gap. Simulating lead placement, or calibrating per user, is the next step.
+
+### 5. Inverse PINN: where physics helps and where it does not
 
 | input SNR (real ECG + real NSTDB noise) | band-pass 0.5–40 Hz | NN, no physics | diff-sim (hard) | PINN λ=0.1 |
 |---|---|---|---|---|
@@ -137,7 +152,8 @@ On real data the physics prior pays off only when noise dominates. At higher SNR
 ```bash
 bash scripts/run_sensing_gen.sh smoke   # download + tests + 3-minute smoke pass
 bash scripts/run_sensing_gen.sh full    # full run (~4 h on an Apple M-series laptop, MPS)
-python -m sensing_gen.experiments.run_all multiphysics sensor_ablation guidance   # follow-up steps
+python -m sensing_gen.data.download --drivedb-only
+python -m sensing_gen.experiments.run_all multiphysics sensor_ablation guidance driving   # follow-up steps
 python -m pytest -q tests/test_sensing_gen.py
 ```
 

@@ -22,6 +22,7 @@ from pathlib import Path
 
 PTBXL = "https://physionet.org/files/ptb-xl/1.0.3/"
 NSTDB = "https://physionet.org/files/nstdb/1.0.0/"
+DRIVEDB = "https://physionet.org/files/drivedb/1.0.0/"
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -69,13 +70,31 @@ def select_ptbxl_records(db_csv: Path, train_per_fold: int, eval_per_fold: int) 
     return chosen
 
 
+def fetch_drivedb(dest: Path) -> list[str]:
+    """Healey & Picard (2005): ECG/EDA/respiration recorded from drivers on real roads."""
+    recs = [r.strip() for r in fetch(DRIVEDB + "RECORDS", dest / "RECORDS").read_text().split() if r.strip()]
+    print(f"[download] drivedb: {len(recs)} records")
+    for r in recs:
+        hea = fetch(DRIVEDB + f"{r}.hea", dest / f"{r}.hea")
+        dats = {ln.split()[0] for ln in hea.read_text().splitlines()[1:]
+                if ln.strip() and not ln.startswith("#")}
+        for d in dats:
+            fetch(DRIVEDB + d, dest / d)
+    return recs
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/sensing_gen")
     ap.add_argument("--train-per-fold", type=int, default=500)
     ap.add_argument("--eval-per-fold", type=int, default=600)
     ap.add_argument("--workers", type=int, default=12)
+    ap.add_argument("--drivedb-only", action="store_true",
+                    help="only fetch the PhysioNet 'Stress Recognition in Automobile Drivers' records")
     a = ap.parse_args(argv)
+    if a.drivedb_only:
+        fetch_drivedb(Path(a.root) / "drivedb")
+        return
 
     root = Path(a.root)
     ptb = root / "ptbxl"

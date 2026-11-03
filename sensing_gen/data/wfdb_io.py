@@ -22,6 +22,7 @@ class SignalSpec:
     baseline: int
     units: str
     description: str
+    spf: int = 1            # samples per frame (multi-frequency records)
 
 
 @dataclass
@@ -61,11 +62,13 @@ def read_header(path: PathLike) -> Header:
     sigs: List[SignalSpec] = []
     for ln in lines[1 : 1 + n_sig]:
         tok = ln.split()
-        fmt = int(tok[1].split("x")[0].split(":")[0].split("+")[0])
+        ftok = tok[1].split(":")[0].split("+")[0]
+        fmt = int(ftok.split("x")[0])
+        spf = int(ftok.split("x")[1]) if "x" in ftok else 1
         adc_zero = int(tok[4]) if len(tok) > 4 else 0
         gain, baseline, units = _parse_gain(tok[2] if len(tok) > 2 else "200", adc_zero)
         desc = " ".join(tok[8:]) if len(tok) > 8 else f"sig{len(sigs)}"
-        sigs.append(SignalSpec(tok[0], fmt, gain, baseline, units, desc))
+        sigs.append(SignalSpec(tok[0], fmt, gain, baseline, units, desc, spf))
     return Header(name, n_sig, fs, n_samples, sigs)
 
 
@@ -120,3 +123,36 @@ def read_record(record_path: PathLike) -> tuple[np.ndarray, Header]:
     base = np.array([s.baseline for s in hdr.signals], dtype=np.float64)
     phys = (digital - base) / gains
     return phys.astype(np.float32), hdr
+
+
+def read_record_multi(record_path: PathLike) -> tuple[dict, Header]:
+    """Read a (possibly multi-frequency) record. Returns ({description: (signal, fs)}, header).
+
+    Supports formats 16 and 212 with per-signal samples-per-frame ("16x31" style tokens); the
+    base sampling frequency in the header is the *frame* rate.
+    """
+    record_path = Path(record_path)
+    hdr = read_header(record_path.with_suffix(".hea"))
+    fmt = hdr.signals[0].fmt
+    if any(s.fmt != fmt for s in hdr.signals):
+        raise ValueError("Mixed signal formats are not supported")
+    raw = np.fromfile(record_path.parent / hdr.signals[0].file_name, dtype=np.uint8)
+    if fmt == 16:
+        digital = raw[: len(raw) // 2 * 2].view("<i2").astype(np.int32)
+    elif fmt == 212:
+        digital = decode_212(raw, (len(raw) // 3) * 2)
+    else:
+        raise NotImplementedError(f"WFDB format {fmt} not supported")
+    spf = np.array([s.spf for s in hdr.signals])
+    per_frame = int(spf.sum())
+    n_frames = len(digital) // per_frame
+    if hdr.n_samples:
+        n_frames = min(n_frames, hdr.n_samples)
+    frames = digital[: n_frames * per_frame].reshape(n_frames, per_frame)
+    out, col = {}, 0
+    for s_, k in zip(hdr.signals, spf):
+        x = frames[:, col : col + k].reshape(-1).astype(np.float64)
+        col += k
+        name = s_.description.strip() or s_.file_name
+        out[name] = (((x - s_.baseline) / s_.gain).astype(np.float32), hdr.fs * k)
+    return out, hdr
