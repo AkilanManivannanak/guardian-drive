@@ -21,6 +21,27 @@
 
 </div>
 
+## 60-second tour
+
+<p align="center">
+  <a href="https://akilalours.github.io/guardian-drive/explorer.html"><b>Open the interactive results explorer →</b></a><br>
+  <sub>Toggle noise levels, compare samplers, drag an electrode off the skin, and draw random generated ECG. Every number comes from a result file in this repo.</sub>
+</p>
+
+<p align="center">
+  <img alt="AUROC under real 0 dB noise: 0.654 to 0.818" src="https://img.shields.io/badge/AUROC%20%40%200%20dB%20real%20noise-0.654%20%E2%86%92%200.818-2a78d6?style=for-the-badge">
+  <img alt="Broken diffusion samples: 40% to 0.5%" src="https://img.shields.io/badge/broken%20diffusion%20samples-40%25%20%E2%86%92%200.5%25-eb6834?style=for-the-badge">
+  <img alt="Train on synthetic, test on real AUROC 0.829" src="https://img.shields.io/badge/train%20on%20synthetic%20AUROC-0.829%20vs%200.801%20real-1baf7a?style=for-the-badge">
+  <img alt="Physics model fitted to 3,907 real heartbeats, R squared 0.95" src="https://img.shields.io/badge/physics%20fit-3%2C907%20beats%2C%20R%C2%B2%200.95-52514e?style=for-the-badge">
+</p>
+
+| If you have… | Start here |
+|---|---|
+| 1 minute | the [interactive explorer](https://akilalours.github.io/guardian-drive/explorer.html) and the two animations below |
+| 5 minutes | [Headline results](#headline-results) and the expandable experiment cards |
+| 15 minutes | the [4-page technical report](docs/sensing_gen_report.pdf) |
+| an afternoon | `bash scripts/run_sensing_gen.sh` reproduces everything on a laptop |
+
 ---
 
 ## What this project is
@@ -80,16 +101,97 @@ bash scripts/run_sensing_gen.sh        # download data -> tests -> smoke run -> 
 python -m sensing_gen.data.download --drivedb-only && python -m sensing_gen.experiments.run_all multiphysics sensor_ablation guidance driving
 ```
 
+### How the pieces fit
+
+```mermaid
+flowchart LR
+    R[("PTB-XL<br/>real ECG")]:::data --> C["Differentiable ECG simulator<br/>calibrated to 3,907 beats"]
+    R --> E["Conditional 1-D diffusion<br/>diagnosis + heart rate"]
+    R --> F["ECG classifier"]
+    C -->|"pre-training (10 % data)"| E
+    C --> P["Inverse PINN<br/>denoising + parameters"]
+    M["Multiphysics electrode model<br/>contact mechanics + EQS FV"] -->|"checks priors"| S["Physics sensor model<br/>motion, impedance, mains, EMG"]
+    S -->|"on-the-fly augmentation"| F
+    E -->|"synthetic ECG"| F
+    F --> G{{"Evaluation"}}
+    N[("NSTDB real noise<br/>held-out half")]:::data -->|"test only"| G
+    V[("drivedb<br/>real driving ECG")]:::data --> G
+    classDef data fill:#eef4fc,stroke:#2a78d6,color:#0b0b0b;
+```
+
 <table>
   <tr>
-    <td width="50%"><img src="outputs/sensing_gen/fig_samples_wsel.png" alt="Randomly drawn real and diffusion-generated single-lead ECG" width="100%"></td>
-    <td width="50%"><img src="outputs/sensing_gen/fig_multiphysics.png" alt="Electro-quasi-static potential in layered tissue, electrode impedance spectra and motion sensitivity" width="100%"></td>
+    <td width="50%"><img src="docs/media/diffusion_sampler_fix.gif" alt="Animated random draws: real ECG, diffusion samples with the original sampler saturating at the clip rail, and realistic samples with the fixed sampler" width="100%"></td>
+    <td width="50%"><img src="docs/media/multiphysics_liftoff.gif" alt="Animation of the electro-quasi-static potential in layered tissue as one electrode lifts off, with the rise in impedance for wet and dry electrodes" width="100%"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Random (not cherry-picked) real test ECG vs diffusion samples after the sampler fix.</sub></td>
-    <td align="center"><sub>Multiphysics electrode model: EQS potential, wet vs dry impedance, motion sensitivity.</sub></td>
+    <td align="center"><sub><b>The sampler bug, live.</b> Random (not cherry-picked) draws. The original sampler pins 40 % of samples to the rail; the fix brings that to 0.5 % with no retraining.</sub></td>
+    <td align="center"><sub><b>Multiphysics.</b> As one electrode lifts, current crowds under its smaller footprint and |Z| rises 12 % at 20 % lift-off, the coupling the sensor model simulates.</sub></td>
   </tr>
 </table>
+
+### Experiment cards
+
+<details>
+<summary><b>1 · Robustness:</b> physics sensor simulation beats real-noise augmentation (0 dB AUROC 0.654 → 0.818)</summary>
+
+| training (100 % PTB-XL, 3 seeds) | clean | 6 dB real noise | 0 dB real noise |
+|---|---|---|---|
+| real only | 0.812 | 0.762 | 0.654 |
+| + real NSTDB noise (reference) | 0.823 | 0.820 | 0.807 |
+| + physics sensor model | 0.833 | 0.829 | 0.818 |
+| **+ diffusion samples + sensor model** | **0.838** | **0.834** | **0.827** |
+
+The sensor model never sees NSTDB; the test noise is the held-out half of every NSTDB recording. [`downstream_results.json`](outputs/sensing_gen/downstream_results.json) · [`guidance_results.json`](outputs/sensing_gen/guidance_results.json)
+</details>
+
+<details>
+<summary><b>2 · Diffusion:</b> a sampler bug diagnosed and fixed without retraining (40 % → 0.5 % broken samples)</summary>
+
+Guidance was ruled out by a sweep (still 39 % broken at w = 0). Root cause: DDIM started at t = T−1, where the cosine schedule leaves ᾱ ≈ 2.4×10⁻⁹ and the x̂₀ estimate multiplies ε-error ~20,000×. Leading timesteps plus dynamic thresholding, selected on validation:
+
+| | original sampler | fixed sampler |
+|---|---|---|
+| saturated samples | 40 % | 0.5 % |
+| real-vs-fake discriminator accuracy (0.5 ideal) | 0.96 | 0.63 |
+| train-on-synthetic, test-on-real AUROC | 0.819 | **0.829** (real data: 0.801) |
+
+<img src="outputs/sensing_gen/fig_samples_wsel.png" alt="Random real and generated ECG with the fixed sampler" width="100%">
+</details>
+
+<details>
+<summary><b>3 · Physics + multiphysics:</b> simulator fitted to 3,907 real beats; electrode model verified to 2×10⁻⁴</summary>
+
+<img src="outputs/sensing_gen/fig_calibration.png" alt="Calibrated ECG ODE against real median beats" width="100%">
+
+* Median R² 0.951 (IQR 0.91–0.97) over 3,907 real median beats, fitted by gradient descent through the simulator.
+* Electrode model: analytic thin-strip error 2×10⁻⁴, reciprocity 10⁻¹⁰, grid convergence 7×10⁻⁵; wet 21.5 kΩ vs dry 443 kΩ at 10 Hz.
+* Null result: multiphysics-derived sensor priors did not improve the classifier (0.801 vs 0.818 at 0 dB).
+
+<!-- COMSOL-CHECK:BEGIN -->
+**COMSOL cross-check:** not run yet. The [step-by-step guide](sensing_gen/multiphysics/comsol/README.md) and `python -m sensing_gen.multiphysics.compare_comsol` will fill this line with the measured agreement.
+<!-- COMSOL-CHECK:END -->
+</details>
+
+<details>
+<summary><b>4 · Real driving ECG:</b> the model transfers (13.9 % vs 12.4 % false alarms), augmentation adds nothing</summary>
+
+<img src="outputs/sensing_gen/fig_driving.png" alt="Real in-car ECG and false-alarm rates per training configuration" width="100%">
+
+18 drives on real roads (PhysioNet drivedb), 7,995 ten-second windows, thresholds fixed on clinical validation data. All augmentations leave in-car false alarms unchanged within noise (driver-bootstrap CIs include 0). Alarms concentrate in a few drivers, so electrode placement, not noise, is the remaining gap. [`driving_results.json`](outputs/sensing_gen/driving_results.json)
+</details>
+
+<details>
+<summary><b>5 · Inverse PINN:</b> physics wins only when noise dominates</summary>
+
+| input SNR (real ECG + real noise) | band-pass | PINN λ=0.1 | diff-sim (hard) |
+|---|---|---|---|
+| 0 dB | 6.3 dB | 7.7 dB | 7.7 dB |
+| 6 dB | **13.9 dB** | 12.2 dB | 8.0 dB |
+| 12 dB | **21.0 dB** | 16.3 dB | 8.4 dB |
+
+On simulated data the PINN recovers P/T-wave parameters within 4–9 %. [`pinn_results.json`](outputs/sensing_gen/pinn_results.json)
+</details>
 
 ## Visual tour
 

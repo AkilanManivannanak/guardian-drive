@@ -246,3 +246,17 @@ def test_read_record_multi_frequency(tmp_path):
     sigs, hdr = read_record_multi(tmp_path / "m")
     assert np.array_equal(sigs["ECG"][0], a) and sigs["ECG"][1] == 62.0
     assert np.array_equal(sigs["RESP"][0], b) and sigs["RESP"][1] == 15.5
+
+
+def test_compare_comsol_roundtrip(tmp_path):
+    from sensing_gen.multiphysics import compare_comsol as cc
+    f = np.array([1.0, 10.0, 100.0])
+    z = cc.python_reference(f)
+    csv = tmp_path / "c.csv"
+    csv.write_text("% freq (Hz), abs(ec.Z11) (Ohm)\n" + "\n".join(f"{a},{abs(b)}" for a, b in zip(f, z)))
+    fr, mag, _ = cc.read_table(csv, current=False)
+    assert np.allclose(fr, f) and np.allclose(mag, np.abs(z))
+    md = tmp_path / "R.md"
+    md.write_text(f"a\n{cc.MARK_BEGIN}\nold\n{cc.MARK_END}\nb\n")
+    cc.update_readme(md, "new line")
+    assert "new line" in md.read_text() and "old" not in md.read_text()

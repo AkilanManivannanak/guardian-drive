@@ -1,5 +1,7 @@
 # sensing_gen: simulation and generative models for wearable physiological signals
 
+**[Interactive results explorer →](https://akilalours.github.io/guardian-drive/explorer.html)** · [technical report (PDF)](../docs/sensing_gen_report.pdf)
+
 The question this module answers: **can physics-based simulation and generative models give a
 wearable-ECG model more, and harder, training data than real-world collection alone, and can we
 measure whether they helped?**
@@ -118,6 +120,9 @@ so compare distances within a table, not across tables.
 * The ECG ODE, calibrated by gradient descent through the simulator, explains **3,907 real median beats** with median **R² = 0.951** (IQR 0.91–0.97); see `fig_calibration.png`.
 * The electrode–skin multiphysics solver is verified to **2×10⁻⁴** (analytic thin strip), **10⁻¹⁰** (reciprocity) and **7×10⁻⁵** (grid convergence).
   It predicts 21.5 kΩ (gel) vs 443 kΩ (dry) at 10 Hz, near-zero pressure sensitivity for gel but κ ≈ 0.4 for dry electrodes, and lift-off sensitivity κ ≈ 0.6.
+<!-- COMSOL-CHECK:BEGIN -->
+* **COMSOL cross-check:** not run yet. See the [step-by-step guide](multiphysics/comsol/README.md); `python -m sensing_gen.multiphysics.compare_comsol` fills this line with the measured agreement.
+<!-- COMSOL-CHECK:END -->
 * **Negative result.** Widening the sensor model's priors to the multiphysics range did *not* help (0 dB AUROC 0.801 ± 0.013 vs 0.818 ± 0.007). The augmentation benefit is robust to the exact priors.
 
 ### 4. Real in-car ECG: a deployment check that came back null
