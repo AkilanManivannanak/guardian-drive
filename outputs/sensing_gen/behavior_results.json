@@ -1,0 +1,443 @@
+{
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.9.1",
+    "device": "mps",
+    "machine": "arm64",
+    "platform": "macOS-27.2-arm64-arm-64bit",
+    "time": "2026-11-04 09:11:50"
+  },
+  "activities": [
+    "walking",
+    "upstairs",
+    "downstairs",
+    "sitting",
+    "standing",
+    "lying"
+  ],
+  "n_train": 5867,
+  "n_val": 1485,
+  "n_test": 2947,
+  "fidelity": {
+    "100pct": {
+      "frechet_distance": 114.84408271187354,
+      "frechet_distance_real_train_vs_test": 2.6922121000224495,
+      "label_consistency": 0.547298448951764,
+      "tstr_macro_f1": 0.9449706347554865,
+      "seconds": 1245.0
+    },
+    "10pct": {
+      "frechet_distance": 333.62069419934573,
+      "frechet_distance_real_train_vs_test": 3.6252087746683506,
+      "label_consistency": 0.46266666666666667,
+      "tstr_macro_f1": 0.7765477653954345,
+      "seconds": 438.4
+    }
+  },
+  "results": {
+    "100pct": {
+      "real": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9188838681830181,
+            "std": 0.00565455781812206
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9182219205972174,
+            "std": 0.0061141869705868355
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.16330241701097212,
+            "std": 0.007871113024638153
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.21818798778418733,
+            "std": 0.005131227789713274
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9263054245080169,
+            "test_as_recorded_accuracy": 0.9260264675941635,
+            "test_reoriented_phone_macro_f1": 0.17431974511809908,
+            "test_reoriented_phone_accuracy": 0.22531387852052936
+          },
+          {
+            "test_as_recorded_macro_f1": 0.912594056778414,
+            "test_as_recorded_accuracy": 0.9110960298608755,
+            "test_reoriented_phone_macro_f1": 0.15641698449289657,
+            "test_reoriented_phone_accuracy": 0.21343739395995928
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9177521232626238,
+            "test_as_recorded_accuracy": 0.9175432643366135,
+            "test_reoriented_phone_macro_f1": 0.15917052142192065,
+            "test_reoriented_phone_accuracy": 0.2158126908720733
+          }
+        ]
+      },
+      "real+orientation_only_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9619099340998644,
+            "std": 0.003184126700340402
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9606379368849677,
+            "std": 0.0031952147702354106
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.7954279313505485,
+            "std": 0.014021913945979386
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.7895034498359914,
+            "std": 0.01373429181012152
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9594757644780993,
+            "test_as_recorded_accuracy": 0.9575839837122497,
+            "test_reoriented_phone_macro_f1": 0.778138743807566,
+            "test_reoriented_phone_accuracy": 0.7743467933491687
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9598461489110228,
+            "test_as_recorded_accuracy": 0.9592806243637597,
+            "test_reoriented_phone_macro_f1": 0.8124828819301877,
+            "test_reoriented_phone_accuracy": 0.8076009501187649
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9664078889104707,
+            "test_as_recorded_accuracy": 0.9650492025788938,
+            "test_reoriented_phone_macro_f1": 0.7956621683138919,
+            "test_reoriented_phone_accuracy": 0.7865626060400407
+          }
+        ]
+      },
+      "real+imu_sensor_model_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9657718876850833,
+            "std": 0.001958029750552685
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9647098744485918,
+            "std": 0.0019979099346969574
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.7951475444704895,
+            "std": 0.011409751107902821
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.7892772310824568,
+            "std": 0.011051197093608616
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9666347048386511,
+            "test_as_recorded_accuracy": 0.9653885307091958,
+            "test_reoriented_phone_macro_f1": 0.7793396579417262,
+            "test_reoriented_phone_accuracy": 0.7740074652188667
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9630617775754727,
+            "test_as_recorded_accuracy": 0.9619952494061758,
+            "test_reoriented_phone_macro_f1": 0.8002485119703056,
+            "test_reoriented_phone_accuracy": 0.7940278249066848
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9676191806411257,
+            "test_as_recorded_accuracy": 0.9667458432304038,
+            "test_reoriented_phone_macro_f1": 0.8058544634994368,
+            "test_reoriented_phone_accuracy": 0.7997964031218188
+          }
+        ]
+      },
+      "real+diffusion": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9570468995818837,
+            "std": 0.0024157255708979917
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.957357764958715,
+            "std": 0.0025743256818778763
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.2882621602091497,
+            "std": 0.008831244779487275
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.30358556724352453,
+            "std": 0.00819243025098146
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9604325854361891,
+            "test_as_recorded_accuracy": 0.9609772650152698,
+            "test_reoriented_phone_macro_f1": 0.2902085300150767,
+            "test_reoriented_phone_accuracy": 0.3043773328808958
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9549585272338246,
+            "test_as_recorded_accuracy": 0.9552086868001357,
+            "test_reoriented_phone_macro_f1": 0.2766051061584119,
+            "test_reoriented_phone_accuracy": 0.2931795045809298
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9557495860756373,
+            "test_as_recorded_accuracy": 0.9558873430607397,
+            "test_reoriented_phone_macro_f1": 0.2979728444539605,
+            "test_reoriented_phone_accuracy": 0.31319986426874785
+          }
+        ]
+      },
+      "real+diffusion+imu_sensor_model_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9584184878097378,
+            "std": 0.013016262777922007
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9570184368284131,
+            "std": 0.013299854373793602
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.6805414582609224,
+            "std": 0.03160892996528263
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.6708517136070581,
+            "std": 0.029321301655504377
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9739898438902336,
+            "test_as_recorded_accuracy": 0.9731930777061418,
+            "test_reoriented_phone_macro_f1": 0.7124724699588273,
+            "test_reoriented_phone_accuracy": 0.6979979640312182
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9591348270252169,
+            "test_as_recorded_accuracy": 0.9572446555819477,
+            "test_reoriented_phone_macro_f1": 0.6916682861853163,
+            "test_reoriented_phone_accuracy": 0.6844248388191381
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9421307925137627,
+            "test_as_recorded_accuracy": 0.9406175771971497,
+            "test_reoriented_phone_macro_f1": 0.6374836186386235,
+            "test_reoriented_phone_accuracy": 0.6301323379708178
+          }
+        ]
+      }
+    },
+    "10pct": {
+      "real": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.8915596432684754,
+            "std": 0.008849635632664485
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.8914149983033592,
+            "std": 0.008708687503639973
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.1918225310623255,
+            "std": 0.004617343982912875
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.23662481619726275,
+            "std": 0.0043130134520840665
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.8995926235579597,
+            "test_as_recorded_accuracy": 0.8988802171700034,
+            "test_reoriented_phone_macro_f1": 0.19143702162692602,
+            "test_reoriented_phone_accuracy": 0.23719036308109942
+          },
+          {
+            "test_as_recorded_macro_f1": 0.8958544404486882,
+            "test_as_recorded_accuracy": 0.8961655921275874,
+            "test_reoriented_phone_macro_f1": 0.19766049038581468,
+            "test_reoriented_phone_accuracy": 0.24160162877502545
+          },
+          {
+            "test_as_recorded_macro_f1": 0.8792318657987784,
+            "test_as_recorded_accuracy": 0.8791991856124872,
+            "test_reoriented_phone_macro_f1": 0.18637008117423584,
+            "test_reoriented_phone_accuracy": 0.23108245673566338
+          }
+        ]
+      },
+      "real+orientation_only_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.8926593897239248,
+            "std": 0.0029944496169213657
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.8932247483316367,
+            "std": 0.003051857835817673
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.6080256242893997,
+            "std": 0.06206958223438489
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.613957697093089,
+            "std": 0.050539264356785484
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.8897022209137183,
+            "test_as_recorded_accuracy": 0.8914149983033594,
+            "test_reoriented_phone_macro_f1": 0.5479572926192916,
+            "test_reoriented_phone_accuracy": 0.5683746182558534
+          },
+          {
+            "test_as_recorded_macro_f1": 0.8967631326448852,
+            "test_as_recorded_accuracy": 0.8975229046487954,
+            "test_reoriented_phone_macro_f1": 0.6934925981527686,
+            "test_reoriented_phone_accuracy": 0.6844248388191381
+          },
+          {
+            "test_as_recorded_macro_f1": 0.8915128156131709,
+            "test_as_recorded_accuracy": 0.8907363420427553,
+            "test_reoriented_phone_macro_f1": 0.5826269820961386,
+            "test_reoriented_phone_accuracy": 0.5890736342042755
+          }
+        ]
+      },
+      "real+imu_sensor_model_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9099743199928344,
+            "std": 0.007757441137770259
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9097387173396675,
+            "std": 0.0070255401666189585
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.6229080447780082,
+            "std": 0.060644037878214534
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.6331862911435359,
+            "std": 0.049188145580476496
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9052999489791452,
+            "test_as_recorded_accuracy": 0.9060061079063454,
+            "test_reoriented_phone_macro_f1": 0.5748084699064416,
+            "test_reoriented_phone_accuracy": 0.5982354937224296
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9037161851898393,
+            "test_as_recorded_accuracy": 0.9036308109942314,
+            "test_reoriented_phone_macro_f1": 0.5854649694723123,
+            "test_reoriented_phone_accuracy": 0.5985748218527316
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9209068258095187,
+            "test_as_recorded_accuracy": 0.9195792331184255,
+            "test_reoriented_phone_macro_f1": 0.7084506949552707,
+            "test_reoriented_phone_accuracy": 0.7027485578554462
+          }
+        ]
+      },
+      "real+diffusion": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.8896427751786069,
+            "std": 0.010132303370388725
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.8898314670286167,
+            "std": 0.010113015698340486
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.278799047071879,
+            "std": 0.014726098989347399
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.30969347358896054,
+            "std": 0.004348463473982831
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.8812128349905023,
+            "test_as_recorded_accuracy": 0.8808958262639973,
+            "test_reoriented_phone_macro_f1": 0.29106315987117226,
+            "test_reoriented_phone_accuracy": 0.3138785205293519
+          },
+          {
+            "test_as_recorded_macro_f1": 0.8838229339289857,
+            "test_as_recorded_accuracy": 0.8846284356973193,
+            "test_reoriented_phone_macro_f1": 0.2580902749893103,
+            "test_reoriented_phone_accuracy": 0.3036986766202918
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9038925566163328,
+            "test_as_recorded_accuracy": 0.9039701391245334,
+            "test_reoriented_phone_macro_f1": 0.28724370635515445,
+            "test_reoriented_phone_accuracy": 0.31150322361723787
+          }
+        ]
+      },
+      "real+diffusion+imu_sensor_model_aug": {
+        "summary": {
+          "test_as_recorded_macro_f1": {
+            "mean": 0.9276233886824169,
+            "std": 0.019925183758340757
+          },
+          "test_as_recorded_accuracy": {
+            "mean": 0.9272706707386043,
+            "std": 0.01866064772255576
+          },
+          "test_reoriented_phone_macro_f1": {
+            "mean": 0.6437142352668771,
+            "std": 0.06587739027794393
+          },
+          "test_reoriented_phone_accuracy": {
+            "mean": 0.6426874787919918,
+            "std": 0.057383587385659254
+          }
+        },
+        "runs": [
+          {
+            "test_as_recorded_macro_f1": 0.9484364995440209,
+            "test_as_recorded_accuracy": 0.9477434679334917,
+            "test_reoriented_phone_macro_f1": 0.6859673098782846,
+            "test_reoriented_phone_accuracy": 0.6806922293858161
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9007659902974557,
+            "test_as_recorded_accuracy": 0.9026128266033254,
+            "test_reoriented_phone_macro_f1": 0.550679742287542,
+            "test_reoriented_phone_accuracy": 0.5615880556498134
+          },
+          {
+            "test_as_recorded_macro_f1": 0.9336676762057737,
+            "test_as_recorded_accuracy": 0.9314557176789956,
+            "test_reoriented_phone_macro_f1": 0.6944956536348048,
+            "test_reoriented_phone_accuracy": 0.6857821513403461
+          }
+        ]
+      }
+    }
+  }
+}

@@ -123,12 +123,12 @@ real+diffusion(fixed)+sensor_model_aug: change in in-car false alarms vs real-on
 
 ## Physics-informed (limit-cycle) guidance for the diffusion sampler (no retraining)
 
-Selected on validation: λ = 0.05
+Selected on validation: λ = 0.05 on the first 100 % of sampler steps
 
 | sampler | HR-control MAE (bpm) ↓ | FED ↓ | MMD² ↓ | LSD dB ↓ | disc. ↓ | TSTR AUROC ↑ |
 |---|---|---|---|---|---|---|
-| unguided (λ=0) | 4.12 | 1.05 | 0.0030 | 0.37 | 0.142 | 0.827 |
-| physics_guided (λ=0.05) | 3.98 | 2.64 | 0.0074 | 2.05 | 0.233 | 0.829 |
+| unguided (λ=0, 100 % of steps) | 4.12 | 1.05 | 0.0030 | 0.37 | 0.142 | 0.827 |
+| physics_guided (λ=0.05, 100 % of steps) | 3.98 | 2.64 | 0.0074 | 2.05 | 0.233 | 0.829 |
 
 ## Neural surrogate of the electrode simulator (held-out FE spectra)
 
@@ -172,3 +172,23 @@ Surrogate optimisation 12.8 s vs FE grid search 58 s.
 | 10 % real + 2000 sim_pretrained_diffusion | 0.793 ± 0.011 | 10 % | 0.771 ± 0.025 | 10 % |
 | 10 % real + 4000 sim_pretrained_diffusion | 0.809 ± 0.010 | 50 % | 0.788 ± 0.008 | 10 % |
 | 10 % real + 8000 sim_pretrained_diffusion | 0.822 ± 0.004 | 89 % | 0.803 ± 0.010 | 100 % |
+
+## Human-behaviour signals: phone IMU activity recognition (UCI HAR, 9 unseen subjects)
+
+| regime | training data | macro-F1, as recorded | macro-F1, re-oriented phone |
+|---|---|---|---|
+| 100pct | real | 0.919 ± 0.006 | 0.163 ± 0.008 |
+| 100pct | real+orientation_only_aug | 0.962 ± 0.003 | 0.795 ± 0.014 |
+| 100pct | real+imu_sensor_model_aug | 0.966 ± 0.002 | 0.795 ± 0.011 |
+| 100pct | real+diffusion | 0.957 ± 0.002 | 0.288 ± 0.009 |
+| 100pct | real+diffusion+imu_sensor_model_aug | 0.958 ± 0.013 | 0.681 ± 0.032 |
+| 10pct | real | 0.892 ± 0.009 | 0.192 ± 0.005 |
+| 10pct | real+orientation_only_aug | 0.893 ± 0.003 | 0.608 ± 0.062 |
+| 10pct | real+imu_sensor_model_aug | 0.910 ± 0.008 | 0.623 ± 0.061 |
+| 10pct | real+diffusion | 0.890 ± 0.010 | 0.279 ± 0.015 |
+| 10pct | real+diffusion+imu_sensor_model_aug | 0.928 ± 0.020 | 0.644 ± 0.066 |
+
+| generator | Frechet dist. (real train vs test) | label consistency | TSTR macro-F1 |
+|---|---|---|---|
+| 100pct | 114.84 (2.69) | 0.547 | 0.945 |
+| 10pct | 333.62 (3.63) | 0.463 | 0.777 |

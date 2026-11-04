@@ -400,3 +400,83 @@ def test_wearable_windows_sqi_and_artifact_spectrum():
     assert np.all(ex > 0) and np.isfinite(snr)
     assert shape_match(ex, 3 * ex)["lsd_db"] < 1e-4
     assert is_reference("still") and is_reference("Sitting_rest") and not is_reference("walking")
+
+
+# ---------------------------------------------------------------- public API / CLI
+def test_cli_exact_impedance_runs(capsys):
+    import json
+    from sensing_gen.cli import main
+    main(["impedance", "--exact", "--lift", "0.2"])
+    rows = json.loads(capsys.readouterr().out)
+    assert len(rows) == 21 and 20e3 < rows[0]["abs_z_ohm"] < 30e3
+
+
+@needs_torch
+def test_api_sensor_augmenter_units_and_determinism():
+    from sensing_gen import api
+    x = 0.5 * np.sin(np.linspace(0, 60, 2500))[None].repeat(3, 0)       # 3 records, 250 Hz, mV
+    a = api.SensorAugmenter(seed=1)(x, fs=250)
+    b = api.SensorAugmenter(seed=1)(x, fs=250)
+    assert a.shape == (3, 1000) and np.allclose(a, b) and np.isfinite(a).all()
+    assert 0.05 < np.std(a) < 5.0                                       # stays in millivolts
+
+
+@needs_torch
+def test_api_pretrained_weights_load_if_shipped():
+    from sensing_gen import api
+    if not (api.WEIGHTS / "electrode_surrogate.pt").exists():
+        pytest.skip("weights not present")
+    sur = api.ElectrodeSurrogate.from_pretrained()
+    z, sd = sur.impedance()
+    z_fe, _ = sur.impedance(exact=True)
+    assert np.all(np.abs(np.abs(z) / np.abs(z_fe) - 1) < 0.02) and np.all(sd > 0)
+    with pytest.raises(ValueError):
+        sur.impedance(bogus=1)
+    gen = api.ECGGenerator.from_pretrained()
+    x, y = gen.sample(2, "abnormal", hr_bpm=90, steps=4)
+    assert x.shape == (2, 1000) and np.isfinite(x).all() and (y == 1).all()
+
+
+# ---------------------------------------------------------------- behaviour signals (phone IMU)
+def test_imu_rotation_is_rigid_and_sensor_model_shapes():
+    from sensing_gen.behavior.imu_sensor import IMUSensorModel, random_rotation, rotate
+    rng = np.random.default_rng(0)
+    R = random_rotation(rng, 64)
+    assert np.allclose(np.einsum("nij,nkj->nik", R, R), np.eye(3), atol=1e-12)
+    assert np.allclose(np.linalg.det(R), 1.0)
+    x = rng.standard_normal((64, 6, 128)).astype(np.float32)
+    y = rotate(x, R)
+    # norms of acceleration and angular-rate vectors are invariant under re-orientation
+    assert np.allclose(np.linalg.norm(y[:, :3], axis=1), np.linalg.norm(x[:, :3], axis=1), atol=1e-5)
+    assert np.allclose(np.linalg.norm(y[:, 3:], axis=1), np.linalg.norm(x[:, 3:], axis=1), atol=1e-5)
+    z = IMUSensorModel()(x, rng)
+    assert z.shape == x.shape and z.dtype == np.float32 and np.isfinite(z).all()
+
+
+def test_har_loader_on_fake_layout(tmp_path):
+    from sensing_gen.behavior.har_data import load
+    base = tmp_path / "UCI HAR Dataset"
+    for split, n in (("train", 5), ("test", 3)):
+        sig = base / split / "Inertial Signals"; sig.mkdir(parents=True)
+        for kind in ("total_acc", "body_gyro"):
+            for a in "xyz":
+                np.savetxt(sig / f"{kind}_{a}_{split}.txt", np.ones((n, 128)))
+        np.savetxt(base / split / f"y_{split}.txt", np.arange(1, n + 1), fmt="%d")
+        np.savetxt(base / split / f"subject_{split}.txt", np.full(n, 7), fmt="%d")
+    d = load(tmp_path, cache=False)
+    x, y, s = d["train"]
+    assert x.shape == (5, 6, 128) and y.min() == 0 and (s == 7).all()
+
+
+@needs_torch
+def test_behavior_classifier_and_imu_diffusion_run():
+    from sensing_gen.behavior.train import IMUDiffusion, macro_f1, predict_logits, train_har
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 3, 96)
+    x = (rng.standard_normal((96, 6, 128)) + y[:, None, None]).astype(np.float32)
+    m, f1 = train_har(x, y, x[:32], y[:32], "cpu", steps=30, eval_every=30, k=3)
+    assert 0 <= f1 <= 1 and predict_logits(m, x[:4], "cpu").shape == (4, 3)
+    assert macro_f1(np.array([0, 1, 2]), np.array([0, 1, 2]), 3) == 1.0
+    g = IMUDiffusion(n_classes=3, base=16).fit(x, y, steps=3, log_every=10)
+    s = g.sample(np.array([0, 2]), steps=3)
+    assert s.shape == (2, 6, 128) and np.isfinite(s).all()

@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "guardian-drive"
@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 carla = ["carla==0.9.15"]
+sensing = ["scipy>=1.10", "matplotlib>=3.7"]
 hypothesis = ["hypothesis>=6.80.0"]
 bev = ["mmcv-full>=1.6.0", "mmdet>=2.26.0", "mmdet3d>=1.0.0"]
 nuscenes = ["nuscenes-devkit>=1.1.11"]
@@ -47,10 +48,14 @@ all = [
 
 [project.scripts]
 guardian-train = "scripts.train_all:main"
+sensing-gen = "sensing_gen.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["carla_agent*", "fleet_telemetry*", "bev_perception*", "scripts*"]
+include = ["carla_agent*", "fleet_telemetry*", "bev_perception*", "scripts*", "sensing_gen*"]
+
+[tool.setuptools.package-data]
+sensing_gen = ["weights/*.pt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -87,6 +87,7 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
     <button role="tab" data-tab="pinn" aria-selected="false">PINN denoising</button>
     <button role="tab" data-tab="sur" aria-selected="false">Neural surrogate</button>
     <button role="tab" data-tab="sc" aria-selected="false">How much real data?</button>
+    <button role="tab" data-tab="beh" aria-selected="false">Behaviour: phone IMU</button>
   </nav>
 
   <section class="panel" id="p-rob">
@@ -162,7 +163,7 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
   </section>
 
   <section class="panel" id="p-sc" hidden>
-    <h2>10 % real data + 8,000 generated ECG matches 100 % real data; simulator samples do not</h2>
+    <h2>10 % real data + 8,000 generated ECG performs on par with 100 % real data (3 seeds); simulator samples do not help</h2>
     <p class="finding">10 % of PTB-XL plus N synthetic records, against training on real data alone. The generators saw only the 10 % subset. Every run uses the physics sensor-model augmentation; mean ± std over 3 seeds. Real-only AUROC is flat from 10 % to 50 % and seeds vary by about ±0.01, so read this as a trend, not an exact exchange rate.</p>
     <div class="controls">Test set:
       <span class="seg" id="sc-seg"><button aria-pressed="true" data-v="clean">Clean</button><button aria-pressed="false" data-v="nstdb_0dB">Real noise, 0 dB</button></span>
@@ -171,6 +172,17 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
     <div class="chart" id="sc-chart"></div>
     <details><summary>Table view</summary><div id="sc-table"></div></details>
   </section>
+  <section class="panel" id="p-beh" hidden>
+    <h2>Second modality: a physics IMU model makes activity recognition robust on people it never saw</h2>
+    <p class="finding">UCI HAR, waist-worn phone, 6 activities, 9 test subjects never seen in training; macro-F1, mean ± std over 3 seeds. The re-oriented test rotates each window as a re-oriented rigid phone would measure it. The IMU diffusion samples are noisier than real data (Fréchet 115 vs 2.7) yet still add accuracy on recorded data.</p>
+    <div class="controls">Training data:
+      <span class="seg" id="beh-seg"><button aria-pressed="true" data-v="100pct">All train subjects</button><button aria-pressed="false" data-v="10pct">10 % of windows</button></span>
+    </div>
+    <div class="legend" id="beh-legend"></div>
+    <div class="chart" id="beh-chart"></div>
+    <details><summary>Table view</summary><div id="beh-table"></div></details>
+  </section>
+
   <footer>Data: PTB-XL, MIT-BIH NSTDB and drivedb (PhysioNet). Code, protocol and raw result files:
     <a href="https://github.com/AKilalours/guardian-drive">github.com/AKilalours/guardian-drive</a> ·
     <a href="sensing_gen_report.pdf">technical report (PDF)</a>.</footer>
@@ -373,8 +385,23 @@ function drawSc() {
 }
 seg("sc-seg", v => { scKey = v; drawSc(); });
 
+/* ---------- behaviour (IMU) ---------- */
+const D3 = {"100pct":{"real":[[0.9189,0.0057],[0.1633,0.0079]],"real+orientation_only_aug":[[0.9619,0.0032],[0.7954,0.014]],"real+imu_sensor_model_aug":[[0.9658,0.002],[0.7951,0.0114]],"real+diffusion":[[0.957,0.0024],[0.2883,0.0088]],"real+diffusion+imu_sensor_model_aug":[[0.9584,0.013],[0.6805,0.0316]]},"10pct":{"real":[[0.8916,0.0088],[0.1918,0.0046]],"real+orientation_only_aug":[[0.8927,0.003],[0.608,0.0621]],"real+imu_sensor_model_aug":[[0.91,0.0078],[0.6229,0.0606]],"real+diffusion":[[0.8896,0.0101],[0.2788,0.0147]],"real+diffusion+imu_sensor_model_aug":[[0.9276,0.0199],[0.6437,0.0659]]},"fid":{"100pct":[114.8,2.7,0.547,0.945],"10pct":[333.6,3.6,0.463,0.777]}};
+let behReg = "100pct";
+function drawBeh() {
+  const R = D3[behReg];
+  const nm = { "real": "Real only", "real+orientation_only_aug": "+ orientation only", "real+imu_sensor_model_aug": "+ physics IMU model",
+               "real+diffusion": "+ diffusion samples", "real+diffusion+imu_sensor_model_aug": "+ diffusion + IMU model" };
+  const cols = ["--s-base", "--s3", "--s1", "--s2", "--s3"];
+  const ser = Object.keys(R).map((k, i) => ({ name: nm[k] || k, color: ["--s-base", "--s3", "--s1", "--s2", "--text-muted"][i], vals: R[k] }));
+  legend("beh-legend", ser.map(s => [s.name, s.color]));
+  lineChart(document.getElementById("beh-chart"), { cats: ["Phone as recorded", "Phone re-oriented"], series: ser, y0: 0, y1: 1, fmt: f3, h: 300 });
+  table("beh-table", ["Training data", "Macro-F1 as recorded", "Macro-F1 re-oriented"], Object.keys(R).map(k => [nm[k] || k, `${f3(R[k][0][0])} ± ${f3(R[k][0][1])}`, `${f3(R[k][1][0])} ± ${f3(R[k][1][1])}`]));
+}
+seg("beh-seg", v => { behReg = v; drawBeh(); });
+
 /* ---------- tabs + resize ---------- */
-const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn, sur: drawSur, sc: drawSc };
+const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn, sur: drawSur, sc: drawSc, beh: drawBeh };
 let current = "rob";
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("#tabs button").forEach(x => x.setAttribute("aria-selected", x === b));

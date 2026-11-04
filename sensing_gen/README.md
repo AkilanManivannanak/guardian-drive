@@ -43,6 +43,8 @@ muscle-artifact and baseline-wander noise. Every number below comes from
 | `eval/` | Fréchet ECG distance and MMD² on classifier embeddings, Welch log-spectral distance, heart-rate Wasserstein distance, discriminative score, train-on-synthetic-test-on-real (TSTR), and the downstream train/eval loop. |
 | `multiphysics/electrode_skin_fem.py` | Independent P1 finite-element solver (contact-impedance Robin condition) used to cross-check the finite-volume solver; `fem_spectrum` assembles once and re-solves per frequency for dataset generation. |
 | `surrogate/` | **Neural surrogate** of the FE electrode simulator: parameter space and Latin-hypercube sampling, parallel FE dataset generation, a physics-informed (analytic contact prior + learned correction) deep ensemble with β-NLL variance heads, and robust electrode design by projected gradient ascent through the surrogate. |
+| `behavior/` | Second modality: UCI HAR loader (raw 6-axis IMU), a physics IMU sensor model (rigid re-orientation of accelerometer and gyroscope, calibration errors, loose-mount wobble, clock mismatch), a multi-channel activity classifier and a class-conditional IMU diffusion model. |
+| `api.py`, `cli.py` | Public API and `sensing-gen` command line for the sensor model, generator and surrogate; see `docs/MODEL_CARD.md`. |
 | `diffusion/physics_guidance.py` | Limit-cycle guidance energy from the ECG ODE, applied to the sampler's x̂₀ estimate (an ablation; see results §8). |
 | `experiments/` | `run_multiphysics`, `run_calibration`, `run_pinn`, `run_diffusion`, `run_downstream`, `run_sensor_ablation`, `run_guidance`, `run_driving`, `run_fem_crosscheck`, `run_physics_guidance`, `run_surrogate`, `run_design`, `run_scaling`, orchestrated by `run_all` (with `smoke` and `full` profiles). |
 
@@ -207,6 +209,25 @@ On the test fold it did **not** hold: Fréchet 1.05 → 2.64, log-spectral dista
 * With 8,000 generated records, 10 % real data matches 100 % real data (0.822 vs 0.824 clean; 0.803 vs 0.802 at 0 dB). Smaller generated sets do not, and simulator samples never help here.
 * The real-only curve is flat from 10 % to 50 % once sensor augmentation is on, and the seed spread is about ±0.01. Read this as "generation at scale recovers the last real-data gain", not as an exact exchange rate.
 
+### 10. Second modality: phone IMU activity recognition (human behaviour)
+
+UCI HAR raw inertial signals (total acceleration incl. gravity, angular rate; 128 samples at 50 Hz; 6 activities). Train on 17 subjects, select on 4, test on the 9 official test subjects. Test sets: as recorded, and every window rotated by a uniform random 3-D rotation applied jointly to accelerometer and gyroscope (what a re-oriented rigid phone measures). 3 seeds; macro-F1.
+
+| regime | training data | as recorded | re-oriented phone |
+|---|---|---|---|
+| 100 % | real | 0.919 ± 0.006 | 0.163 ± 0.008 |
+| 100 % | + orientation-only augmentation | 0.962 ± 0.003 | 0.795 ± 0.014 |
+| 100 % | + physics IMU sensor model | **0.966 ± 0.002** | **0.795 ± 0.011** |
+| 100 % | + diffusion samples | 0.957 ± 0.002 | 0.288 ± 0.009 |
+| 100 % | + diffusion + sensor model | 0.958 ± 0.013 | 0.681 ± 0.032 |
+| 10 % | real | 0.892 ± 0.009 | 0.192 ± 0.005 |
+| 10 % | + orientation-only augmentation | 0.893 ± 0.003 | 0.608 ± 0.062 |
+| 10 % | + physics IMU sensor model | 0.910 ± 0.008 | 0.623 ± 0.061 |
+| 10 % | + diffusion samples | 0.890 ± 0.010 | 0.279 ± 0.015 |
+| 10 % | + diffusion + sensor model | 0.928 ± 0.020 | 0.644 ± 0.066 |
+
+Generator (trained on its regime only): Fréchet distance in a real-trained classifier's embedding 114.8 (100 %) and 333.6 (10 %), against 2.7 / 3.6 for held-out real windows; label consistency 0.55 / 0.46; train-on-synthetic macro-F1 0.945 / 0.777. The samples carry class information but have too much high-frequency content (visible in `fig_behavior.png`); a fidelity fix (as for the ECG sampler) is the next step.
+
 ## Reproduce
 
 ```bash
@@ -215,6 +236,7 @@ bash scripts/run_sensing_gen.sh full    # full run (~4 h on an Apple M-series la
 python -m sensing_gen.data.download --drivedb-only
 python -m sensing_gen.experiments.run_all multiphysics sensor_ablation guidance driving   # follow-up steps
 python -m sensing_gen.experiments.run_all fem_crosscheck physics_guidance surrogate design scaling   # surrogate, design, scaling
+python -m sensing_gen.experiments.run_all behavior   # phone IMU (downloads UCI HAR, ~60 MB)
 python -m pytest -q tests/test_sensing_gen.py
 ```
 

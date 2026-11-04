@@ -65,7 +65,7 @@ class GaussianDiffusion(nn.Module):
         magnitude (bounded to [4, clip]) instead of a fixed +-clip (Saharia et al., 2022).
         """
         dev = self.ab.device
-        x = torch.randn(n, 1, length, generator=gen).to(dev)
+        x = torch.randn(n, getattr(self.model, "c_in", 1), length, generator=gen).to(dev)
         if spacing == "leading":
             ts = torch.arange(0, self.T, self.T // steps, device=dev).flip(0).long()
         else:

@@ -26,10 +26,10 @@ class Block(nn.Module):
 
 
 class ResNet1D(nn.Module):
-    def __init__(self, n_out: int = 1, width: int = 32, dropout: float = 0.2):
+    def __init__(self, n_out: int = 1, width: int = 32, dropout: float = 0.2, c_in: int = 1):
         super().__init__()
         w = width
-        self.stem = nn.Sequential(nn.Conv1d(1, w, 15, stride=2, padding=7, bias=False),
+        self.stem = nn.Sequential(nn.Conv1d(c_in, w, 15, stride=2, padding=7, bias=False),
                                   nn.BatchNorm1d(w), nn.ReLU())
         self.layers = nn.Sequential(Block(w, w, 2), Block(w, 2 * w, 2), Block(2 * w, 4 * w, 2),
                                     Block(4 * w, 4 * w, 2))

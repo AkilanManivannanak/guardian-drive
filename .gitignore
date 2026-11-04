@@ -77,3 +77,7 @@ state_machine.py.new
 # COMSOL evaluation-license results must not be published
 outputs/sensing_gen/comsol_comparison.json
 outputs/sensing_gen/fig_comsol.png
+
+# shipped weights for the sensing_gen library (17 MB)
+!sensing_gen/weights/
+!sensing_gen/weights/*.pt

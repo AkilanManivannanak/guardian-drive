@@ -14,7 +14,7 @@ import importlib
 from .common import get_profile, out_dir
 
 STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving", "fem_crosscheck",
-         "physics_guidance", "surrogate", "design", "scaling", "wearable"]
+         "physics_guidance", "surrogate", "design", "scaling", "wearable", "behavior"]
 
 
 def fmt(m):
@@ -206,6 +206,20 @@ def write_report(od):
             L += ["", "| motion condition | artifact SNR | shape distance to sensor model | to NSTDB noise |", "|---|---|---|---|"]
             for c, a in d["artifact_spectrum"].items():
                 L.append(f"| {c} | {a['artifact_snr_db']:.1f} dB | {a['vs_sensor_model']['lsd_db']:.2f} dB | {a['vs_nstdb']['lsd_db']:.2f} dB |")
+        L.append("")
+    p = od / "behavior_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Human-behaviour signals: phone IMU activity recognition (UCI HAR, 9 unseen subjects)", "",
+              "| regime | training data | macro-F1, as recorded | macro-F1, re-oriented phone |", "|---|---|---|---|"]
+        for reg, cfgs in d["results"].items():
+            for k, v in cfgs.items():
+                s_ = v["summary"]
+                L.append(f"| {reg} | {k} | {fmt(s_['test_as_recorded_macro_f1'])} | {fmt(s_['test_reoriented_phone_macro_f1'])} |")
+        L += ["", "| generator | Frechet dist. (real train vs test) | label consistency | TSTR macro-F1 |", "|---|---|---|---|"]
+        for reg, f in d["fidelity"].items():
+            L.append(f"| {reg} | {f['frechet_distance']:.2f} ({f['frechet_distance_real_train_vs_test']:.2f}) | "
+                     f"{f['label_consistency']:.3f} | {f['tstr_macro_f1']:.3f} |")
         L.append("")
     (od / "RESULTS.md").write_text("\n".join(L))
     print("\n".join(L))

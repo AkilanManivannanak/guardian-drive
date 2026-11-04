@@ -51,7 +51,7 @@ class UNet1D(nn.Module):
     """Denoiser eps_theta(x_t, t, c). Input length must be divisible by 2**(len(mults)-1)."""
 
     def __init__(self, base: int = 64, mults=(1, 2, 4), n_classes: int = 2, emb: int = 256,
-                 hr_cond: bool = True):
+                 hr_cond: bool = True, c_in: int = 1):
         super().__init__()
         self.n_classes = n_classes
         self.hr_cond = hr_cond
@@ -60,7 +60,8 @@ class UNet1D(nn.Module):
         self.hr_mlp = nn.Sequential(nn.Linear(64, emb), nn.SiLU(), nn.Linear(emb, emb))
         self.null_hr = nn.Parameter(torch.zeros(emb))
         self.base = base
-        self.inp = nn.Conv1d(1, base, 7, padding=3)
+        self.c_in = c_in
+        self.inp = nn.Conv1d(c_in, base, 7, padding=3)
         chans = [base * m for m in mults]
         self.down = nn.ModuleList()
         c = base
@@ -85,7 +86,7 @@ class UNet1D(nn.Module):
                 c = co
             us = nn.Upsample(scale_factor=2, mode="nearest") if i > 0 else nn.Identity()
             self.up.append(nn.ModuleList([blocks, us]))
-        self.out = nn.Sequential(nn.GroupNorm(8, c), nn.SiLU(), nn.Conv1d(c, 1, 7, padding=3))
+        self.out = nn.Sequential(nn.GroupNorm(8, c), nn.SiLU(), nn.Conv1d(c, c_in, 7, padding=3))
         nn.init.zeros_(self.out[-1].weight)
         nn.init.zeros_(self.out[-1].bias)
 

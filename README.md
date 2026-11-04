@@ -34,7 +34,7 @@
   <img alt="Train on synthetic, test on real AUROC 0.829" src="https://img.shields.io/badge/train%20on%20synthetic%20AUROC-0.829%20vs%200.801%20real-1baf7a?style=for-the-badge">
   <img alt="Physics model fitted to 3,907 real heartbeats, R squared 0.95" src="https://img.shields.io/badge/physics%20fit-3%2C907%20beats%2C%20R%C2%B2%200.95-52514e?style=for-the-badge">
   <img alt="Neural surrogate of the electrode simulator: 0.02% error, 37,714 times faster" src="https://img.shields.io/badge/neural%20surrogate-0.02%25%20error%2C%2037%2C714%C3%97%20faster-7c3aed?style=for-the-badge">
-  <img alt="10% real data plus 8,000 diffusion samples matches 100% real data" src="https://img.shields.io/badge/10%25%20real%20%2B%208k%20generated-%E2%89%88%20100%25%20real%20data-d6336c?style=for-the-badge">
+  <img alt="10% real data plus 8,000 generated ECG: AUROC 0.822 vs 0.824 with 100% real data" src="https://img.shields.io/badge/10%25%20real%20%2B%208k%20generated-0.822%20vs%200.824%20(100%25%20real)-d6336c?style=for-the-badge">
 </p>
 
 | If you have… | Start here |
@@ -42,11 +42,16 @@
 | 1 minute | the [interactive explorer](https://akilalours.github.io/guardian-drive/docs/explorer.html) and the two animations below |
 | 5 minutes | [Headline results](#headline-results) and the expandable experiment cards |
 | 15 minutes | the [technical report](docs/sensing_gen_report.pdf) |
-| an afternoon | `bash scripts/run_sensing_gen.sh` reproduces everything on a laptop |
+| an afternoon | `bash scripts/run_sensing_gen.sh` reproduces the core ECG results on a laptop (about 4 h; every follow-up step adds 1–3 h) |
 
 ---
 
-## What this project is
+## What this project is, and what it is not
+
+> **In one sentence:** a research prototype that tests, on public real-world data, whether physics simulation and generative models make wearable-sensing models more accurate and more robust, with every number traceable to a result file and the failures reported next to the successes.
+>
+> **It is not** a medical device, a deployed product, or a claim about any specific wearable. All ECG results use one lead from public clinical data (PTB-XL) with real recorded noise (MIT-BIH NSTDB) and real driving recordings (drivedb); results are means over 3 seeds unless stated, and differences under about 0.01 AUROC are within seed noise. COMSOL results obtained under an evaluation licence are not published.
+
 
 Guardian Drive combines a deterministic multi-sensor simulator, a WebSocket dashboard, driving-perception experiments, and a conditional diffusion prototype for wearable time-series. It is a portfolio and research prototype, not a deployed vehicle safety system.
 
@@ -67,12 +72,27 @@ The most role-relevant work is [`sensing_gen/`](sensing_gen/): simulation and ge
 | **Neural surrogate** of the electrode FE simulator (physics prior + deep ensemble), 1,000 held-out spectra | median \|Z\| error **0.02 %** (5× better than a plain network), **37,714× faster**, 95 % intervals cover 98 %, uncertainty rises 4× outside the training range | [`surrogate_results.json`](outputs/sensing_gen/surrogate_results.json) |
 | **How much real data does generation replace?** 10 % real + 8,000 diffusion samples (generator trained on the same 10 %) vs 100 % real | AUROC **0.822 vs 0.824** clean, **0.803 vs 0.802** at 0 dB; physics-simulator samples alone do not help | [`scaling_results.json`](outputs/sensing_gen/scaling_results.json) |
 | Electrode design by gradient descent through the surrogate, checked with the FE solver | within **0.13 dB** of the brute-force FE optimum; the "maximise spacing" layout loses **1.3 dB** | [`design_results.json`](outputs/sensing_gen/design_results.json) |
+| **Second modality: phone IMU activity recognition** (UCI HAR, 9 unseen subjects, 3 seeds), physics IMU sensor model | macro-F1 **0.919 → 0.966** as recorded; **0.163 → 0.795** with the phone re-oriented | [`behavior_results.json`](outputs/sensing_gen/behavior_results.json) |
 | Inverse PINN, real ECG + real noise at 0 dB | **7.7 dB** vs 6.3 dB band-pass (filtering wins at ≥ 6 dB) | [`pinn_results.json`](outputs/sensing_gen/pinn_results.json) |
 | Real in-car ECG (PhysioNet drivedb, 18 drives), false cardiac alarms at a 10 % design rate | **13.9 %** (transfers); augmentation gives no further gain (driver-bootstrap CIs include 0) | [`driving_results.json`](outputs/sensing_gen/driving_results.json) |
 | CARLA 0.9.15, 7 town scenarios | **320 → 2** collisions vs no intervention | [`carla_real_evaluation_results.json`](outputs/carla_real_evaluation_results.json) |
 | Behavior cloning vs rule-based expert (CARLA) | reward 705.5 vs 711.4; safety accuracy 98.1 % vs 98.3 % | [`carla_agent/eval_results.json`](outputs/carla_agent/eval_results.json) |
 | Cardiac screen (Task A), PTB-XL 12-lead, 800-record run | AUC **0.8545** | [`ptbxl_cardiac_results.json`](outputs/ptbxl_cardiac_results.json) |
 | Tests | unit + Hypothesis property + sensing_gen suites in CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+
+**Where it did not work** (reported in full in the cards below):
+
+| attempt | outcome |
+|---|---|
+| Inverse PINN vs plain band-pass filtering | wins only at 0 dB; filtering wins at 6 and 12 dB |
+| Sensor priors taken from the multiphysics model | no gain over hand-set priors (0.801 vs 0.818 at 0 dB) |
+| Augmentation on real in-car ECG | no reduction in false alarms (driver-bootstrap CIs include 0) |
+| Physics-simulator records as extra training data | no gain at any amount (500–8,000) |
+| Limit-cycle physics guidance of the diffusion sampler | worse fidelity on test (Fréchet 1.05 → 2.64) |
+| Conditional diffusion for WESAD wrist signals | no downstream augmentation benefit |
+| IMU diffusion samples on their own | visibly noisier than real (Fréchet 115 vs 2.7 for real data); they add accuracy but no orientation robustness |
+
+Things to keep in mind when reading the numbers: the "train on synthetic" AUROC above real (0.829 vs 0.801) is a single run on one dataset; the 10 %-real scaling result is 3 seeds with a flat real-only curve between 10 % and 50 %; the surrogate is accurate *inside* its training ranges, and its uncertainty is what tells you when you leave them.
 
 ## Simulation and generative models for wearable ECG (`sensing_gen/`)
 
@@ -104,6 +124,26 @@ to *measure* whether the extra data helps:
 
 Full method, protocol, result tables, negative results and limitations:
 **[sensing_gen/README.md](sensing_gen/README.md)** · technical report: **[docs/sensing_gen_report.pdf](docs/sensing_gen_report.pdf)**.
+
+### Use it in your own pipeline
+
+```bash
+pip install -e ".[sensing]"
+sensing-gen augment ecg_mv.npy ecg_noisy.npy --fs 250 --copies 4    # physics sensor model
+sensing-gen generate synth.npz --n 500 --label abnormal --hr 80      # conditional diffusion (weights shipped)
+sensing-gen impedance --w-el-mm 8 --lift 0.3                         # surrogate; add --exact for the FE solver
+```
+
+```python
+from sensing_gen import api
+noisy = api.SensorAugmenter(seed=0)(ecg_mv, fs=250)
+x_mv, y = api.ECGGenerator.from_pretrained().sample(64, "abnormal", hr_bpm=80)
+z, sigma = api.ElectrodeSurrogate.from_pretrained().impedance(w_el_mm=10, lift=0.2)
+```
+
+Training data, intended use and limits of each component: [docs/MODEL_CARD.md](docs/MODEL_CARD.md).
+
+### Reproduce
 
 ```bash
 bash scripts/run_sensing_gen.sh        # download data -> tests -> smoke run -> full run (~4 h, Apple MPS)
@@ -238,7 +278,7 @@ Maximise an SNR proxy, E[ln s − ½ ln Re Z(10 Hz)], over electrode width w and
 </details>
 
 <details>
-<summary><b>8 · Scaling:</b> 10 % real data + 8,000 generated ECG matches 100 % real; the simulator alone does not</summary>
+<summary><b>8 · Scaling:</b> 10 % real data + 8,000 generated ECG performs on par with 100 % real (3 seeds); the simulator alone does not help</summary>
 
 <img src="outputs/sensing_gen/fig_scaling.png" alt="AUROC against number of synthetic records added to 10 % real data, compared with real-only training at 10, 25, 50 and 100 %" width="100%">
 
@@ -256,7 +296,26 @@ Every run uses the physics sensor-model augmentation, the same classifier and 3 
 </details>
 
 <details>
-<summary><b>9 · Negative result:</b> physics-informed limit-cycle guidance for the diffusion sampler did not help</summary>
+<summary><b>9 · Second modality, human behaviour:</b> phone IMU activity recognition, physics sensor model 0.919 → 0.966 macro-F1 on unseen people</summary>
+
+<img src="outputs/sensing_gen/fig_behavior.png" alt="Real and generated accelerometer windows, and macro-F1 per training configuration on recorded and re-oriented test data" width="100%">
+
+The same recipe on a different sensor: UCI HAR (waist-worn smartphone, 50 Hz, 6 activities), raw accelerometer (with gravity) and gyroscope, subject-disjoint split (17 train, 4 validation, **9 test subjects never seen**). The physics IMU sensor model applies a rigid rotation to both sensors (a re-oriented phone), calibration biases and scale errors, loose-mount wobble and clock mismatch. The "re-oriented phone" test rotates each test window: for a rigid phone this is an exact physical identity, not a noise model, but the augmentation was designed for it, so read that column as a robustness check.
+
+| training (100 % of train subjects, 3 seeds) | macro-F1, as recorded | macro-F1, re-oriented phone |
+|---|---|---|
+| real only | 0.919 ± 0.006 | 0.163 ± 0.008 |
+| + orientation-only augmentation (ablation) | 0.962 ± 0.003 | 0.795 ± 0.014 |
+| **+ physics IMU sensor model** | **0.966 ± 0.002** | **0.795 ± 0.011** |
+| + diffusion samples | 0.957 ± 0.002 | 0.288 ± 0.009 |
+| + diffusion + sensor model | 0.958 ± 0.013 | 0.681 ± 0.032 |
+
+* Orientation is most of the gain; the rest of the sensor model (calibration, wobble, clock) adds +0.017 macro-F1 with 10 % of the data (0.910 vs 0.893).
+* The conditional diffusion model's samples are too noisy (Fréchet distance 115 vs 2.7 for held-out real data; a real-trained classifier labels only 55 % of them as intended), yet training on them alone reaches 0.945 macro-F1 and adding them lifts the real-only model to 0.957. They do not add orientation robustness and slightly dilute it when combined with the sensor model. [`behavior_results.json`](outputs/sensing_gen/behavior_results.json)
+</details>
+
+<details>
+<summary><b>10 · Negative result:</b> physics-informed limit-cycle guidance for the diffusion sampler did not help</summary>
 
 The McSharry ODE is a limit cycle, so a sample conditioned on heart rate HR should repeat every 60/HR s. Guidance pushes the sampler's x̂₀ toward that, x̂₀ ← x̂₀ − λ(x̂₀ − P_τ x̂₀), with no retraining ([`physics_guidance.py`](sensing_gen/diffusion/physics_guidance.py)).
 
