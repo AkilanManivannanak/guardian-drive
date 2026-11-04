@@ -14,7 +14,7 @@ import importlib
 from .common import get_profile, out_dir
 
 STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving", "fem_crosscheck",
-         "physics_guidance", "surrogate", "design", "scaling"]
+         "physics_guidance", "surrogate", "design", "scaling", "wearable"]
 
 
 def fmt(m):
@@ -147,11 +147,12 @@ def write_report(od):
     if p.exists():
         d = json.loads(p.read_text())
         L += ["## Physics-informed (limit-cycle) guidance for the diffusion sampler (no retraining)", "",
-              f"Selected on validation: λ = {d.get('selected_lam', '–')}", "",
+              f"Selected on validation: λ = {d.get('selected_lam', '–')} on the first "
+              f"{100 * d.get('selected_frac', 1.0):.0f} % of sampler steps", "",
               "| sampler | HR-control MAE (bpm) ↓ | FED ↓ | MMD² ↓ | LSD dB ↓ | disc. ↓ | TSTR AUROC ↑ |",
               "|---|---|---|---|---|---|---|"]
         for k, r in d.get("final_on_test", {}).items():
-            L.append(f"| {k} (λ={r['lam']:g}) | {r['hr_control']['mae_bpm']:.2f} | {r['frechet_ecg_distance']:.2f} | "
+            L.append(f"| {k} (λ={r['lam']:g}, {100 * r.get('frac', 1.0):.0f} % of steps) | {r['hr_control']['mae_bpm']:.2f} | {r['frechet_ecg_distance']:.2f} | "
                      f"{r['mmd2_embedding']:.4f} | {r['log_spectral_distance_db']:.2f} | "
                      f"{r['discriminative_score']:.3f} | {r['tstr_auroc']:.3f} |")
         L.append("")
@@ -189,6 +190,22 @@ def write_report(od):
                 e = r["equivalent_real_fraction"]
                 L.append(f"| 10 % real + {n} {name} | {fmt(r['clean'])} | {100 * e['clean']:.0f} % | "
                          f"{fmt(r['nstdb_0dB'])} | {100 * e['nstdb_0dB']:.0f} % |")
+        L.append("")
+    p = od / "wearable_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Self-recorded wearable ECG (" + ", ".join(d.get("devices", [])) + ")", "",
+              "| condition | recordings | windows | detectable beats | beat SQI | false alarms, real | false alarms, +sensor model |",
+              "|---|---|---|---|---|---|---|"]
+        for c, q in d["conditions"].items():
+            fa = d["false_alarms"]
+            sqi = "–" if q["beat_sqi_median"] is None else f"{q['beat_sqi_median']:.2f}"
+            L.append(f"| {c} | {q['n_recordings']} | {q['n_windows']} | {q['frac_detectable_beats']:.2f} | {sqi} | "
+                     f"{100 * fa['real'][c]['rate']:.1f} % | {100 * fa['real+sensor_model_aug'][c]['rate']:.1f} % |")
+        if d.get("artifact_spectrum"):
+            L += ["", "| motion condition | artifact SNR | shape distance to sensor model | to NSTDB noise |", "|---|---|---|---|"]
+            for c, a in d["artifact_spectrum"].items():
+                L.append(f"| {c} | {a['artifact_snr_db']:.1f} dB | {a['vs_sensor_model']['lsd_db']:.2f} dB | {a['vs_nstdb']['lsd_db']:.2f} dB |")
         L.append("")
     (od / "RESULTS.md").write_text("\n".join(L))
     print("\n".join(L))

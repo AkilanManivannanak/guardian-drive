@@ -357,3 +357,46 @@ def test_physics_guided_sampler_runs_and_phys0_is_unchanged():
     c = diff.ddim_sample(2, 256, y, hr, steps=4, w=1.0, gen=torch.Generator().manual_seed(1),
                          spacing="leading", threshold="dynamic", phys=0.3)
     assert torch.equal(a, b) and torch.isfinite(c).all() and not torch.equal(a, c)
+
+
+# ---------------------------------------------------------------- self-recorded wearable ECG
+def _synthetic_ecg(seconds, fs, rr=0.85):
+    t = np.arange(0, seconds, 1 / fs)
+    x = np.zeros_like(t)
+    for b in np.arange(0.4, seconds, rr):
+        x += np.exp(-((t - b) / 0.012) ** 2) - 0.15 * np.exp(-((t - b - 0.25) / 0.05) ** 2)
+    return x
+
+
+def test_wearable_loaders_detect_formats(tmp_path):
+    from sensing_gen.data.wearable_io import load_folder
+    x = 500 * _synthetic_ecg(30, 512)
+    hdr = ("Name,Test Person\nDate of Birth,1990-01-01\nSample Rate,512 hertz\n,\nLead,Lead I\nUnit,µV\n\n")
+    (tmp_path / "still").mkdir(); (tmp_path / "walking").mkdir(); (tmp_path / "board").mkdir()
+    (tmp_path / "still" / "ecg_1.csv").write_text(hdr + "\n".join(f"{v:.3f}" for v in x))
+    ts = (np.arange(0, 20, 1 / 130) * 1e9).astype(np.int64)
+    (tmp_path / "walking" / "polar.txt").write_text(
+        "Phone timestamp;sensor timestamp [ns];timestamp [ms];ecg [uV]\n"
+        + "\n".join(f"2026-11-04T10:00:00;{a};{a // 1000000};{int(500 * np.sin(a * 1e-9 * 7))}" for a in ts))
+    (tmp_path / "board" / "fs.txt").write_text("250")
+    (tmp_path / "board" / "run.txt").write_text("\n".join(str(512 + i % 7) for i in range(3000)))
+    recs = {r.condition: r for r in load_folder(tmp_path)}
+    aw, po, bd = recs["still"], recs["walking"], recs["board"]
+    assert aw.fmt == "apple-watch" and aw.fs == 512 and aw.lead == "Lead I" and abs(np.abs(aw.x).max() - 0.5) < 0.01
+    assert po.fmt == "polar" and abs(po.fs - 130) < 0.5 and abs(np.abs(po.x).max() - 0.5) < 0.01
+    assert bd.fs == 250 and len(bd.x) == 3000
+    assert "Test Person" not in repr(aw)          # personal header data is never kept
+
+
+def test_wearable_windows_sqi_and_artifact_spectrum():
+    from sensing_gen.eval.wearable import beat_sqi, excess_psd, is_reference, shape_match, to_windows
+    rng = np.random.default_rng(0)
+    clean = _synthetic_ecg(60, 512)
+    still = to_windows(clean + 0.01 * rng.standard_normal(len(clean)), 512)
+    moving = to_windows(clean + np.cumsum(rng.standard_normal(len(clean))) * 0.01, 512)
+    assert still.shape[1] == 1000 and len(still) >= 9
+    assert beat_sqi(still[0]) > 0.99 and beat_sqi(moving[0]) < beat_sqi(still[0])
+    f, ex, snr = excess_psd(moving, still)
+    assert np.all(ex > 0) and np.isfinite(snr)
+    assert shape_match(ex, 3 * ex)["lsd_db"] < 1e-4
+    assert is_reference("still") and is_reference("Sitting_rest") and not is_reference("walking")
