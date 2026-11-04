@@ -267,3 +267,93 @@ def test_finite_element_matches_finite_volume():
     from sensing_gen.multiphysics.electrode_skin_fem import fem_impedance
     for f in (10.0, 1000.0):
         assert abs(abs(fem_impedance(f)) / abs(python_reference([f])[0]) - 1) < 0.01
+
+
+# ---------------------------------------------------------------- surrogate, design, physics guidance
+def test_fem_spectrum_matches_pointwise_solver():
+    from sensing_gen.multiphysics.electrode_skin_fem import fem_impedance, fem_spectrum
+    f = [1.0, 100.0, 10000.0]
+    z = fem_spectrum(f, lift=0.2)
+    ref = np.array([fem_impedance(x, lift=0.2, h=0.5e-3, dz0=20e-6, ratio=1.2) for x in f])
+    assert np.allclose(z, ref, rtol=1e-8)
+
+
+def test_surrogate_space_roundtrip_and_contact_prior():
+    from sensing_gen.surrogate.space import FREQS, contact_prior, from_unit, sample, to_unit
+    th = sample(16, seed=3)
+    assert np.allclose(from_unit(to_unit(th)), th)
+    # contact prior equals the explicit complex formula
+    y = (th[:, 5:6] + 1j * 2 * np.pi * FREQS[None] * 8.854e-12 * th[:, 6:7]) / 20e-6
+    w = th[:, 7:8] * 1e-3
+    zc = (1 / (y * w * (1 - th[:, 9:10])) + 1 / (y * w)) / 0.01
+    p = contact_prior(th)
+    assert np.allclose(p[:, :21], np.log10(np.abs(zc))) and np.allclose(p[:, 21:], np.angle(zc))
+
+
+def test_design_projection_is_feasible():
+    from sensing_gen.surrogate.design import project
+    for w, s in [(14, 30), (5, 20), (10, 40), (2, 50), (15, 15)]:
+        pw, ps = project(w, s, 35.0, 5.0)
+        assert 5 - 1e-9 <= pw <= 15 + 1e-9 and 20 - 1e-9 <= ps <= 40 + 1e-9
+        assert ps + pw <= 35 + 1e-6 and ps - pw >= 5 - 1e-6
+
+
+@needs_torch
+def test_contact_prior_torch_matches_numpy():
+    from sensing_gen.surrogate.space import contact_prior, sample, to_unit, unit_to_phys_torch
+    th = sample(8, seed=4)
+    u = torch.tensor(to_unit(th), dtype=torch.float64)
+    pt = contact_prior(unit_to_phys_torch(u), torch).numpy()
+    assert np.allclose(pt, contact_prior(th), atol=1e-8)
+
+
+@needs_torch
+def test_hybrid_surrogate_learns_from_few_simulations():
+    from sensing_gen.surrogate.dataset import simulate, targets
+    from sensing_gen.surrogate.design import surrogate_objective
+    from sensing_gen.surrogate.model import load_surrogate, save_surrogate, train_surrogate
+    from sensing_gen.surrogate.space import sample
+    tr, te = sample(120, seed=0), sample(20, seed=1)
+    ytr, yte = targets(simulate(tr, workers=1)), targets(simulate(te, workers=1))
+    m = train_surrogate(tr, ytr, k=2, steps=300, hybrid=True)
+    pm, ps = m.predict(te)
+    rel = np.abs(10 ** (pm[:, :21] - yte[:, :21]) - 1)
+    assert np.median(rel) < 0.05 and np.all(ps > 0)
+    # save/load and differentiability w.r.t. design variables
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as d:
+        save_surrogate(m, os.path.join(d, "s.pt"))
+        m2 = load_surrogate(os.path.join(d, "s.pt"))
+    assert np.allclose(m2.predict(te)[0], pm, atol=1e-6)
+    w = torch.tensor(10.0, requires_grad=True)
+    s = torch.tensor(25.0, requires_grad=True)
+    surrogate_objective(m2, te, w, s).backward()
+    assert torch.isfinite(w.grad) and torch.isfinite(s.grad)
+
+
+@needs_torch
+def test_limit_cycle_residual():
+    from sensing_gen.diffusion.physics_guidance import limit_cycle_energy, limit_cycle_residual
+    t = torch.arange(1000) / 100.0
+    hr = torch.tensor([72.0, 72.0])
+    periodic = torch.sin(2 * math.pi * t * 72 / 60) + 0.5 * torch.sin(4 * math.pi * t * 72 / 60)
+    x = torch.stack([periodic, torch.randn(1000, generator=torch.Generator().manual_seed(0))])[:, None]
+    e = limit_cycle_energy(x, hr)
+    assert e[0] < 1e-3 and e[1] > 0.5
+    r = limit_cycle_residual(x, hr)
+    assert r.shape == x.shape and torch.isfinite(r).all()
+
+
+@needs_torch
+def test_physics_guided_sampler_runs_and_phys0_is_unchanged():
+    from sensing_gen.diffusion.train import make_model
+    torch.manual_seed(0)
+    diff = make_model(base=16)
+    y = torch.tensor([0, 1]); hr = torch.tensor([60.0, 90.0])
+    a = diff.ddim_sample(2, 256, y, hr, steps=4, w=1.0, gen=torch.Generator().manual_seed(1),
+                         spacing="leading", threshold="dynamic")
+    b = diff.ddim_sample(2, 256, y, hr, steps=4, w=1.0, gen=torch.Generator().manual_seed(1),
+                         spacing="leading", threshold="dynamic", phys=0.0)
+    c = diff.ddim_sample(2, 256, y, hr, steps=4, w=1.0, gen=torch.Generator().manual_seed(1),
+                         spacing="leading", threshold="dynamic", phys=0.3)
+    assert torch.equal(a, b) and torch.isfinite(c).all() and not torch.equal(a, c)

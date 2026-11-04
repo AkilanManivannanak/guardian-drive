@@ -1,0 +1,168 @@
+{
+  "env": {
+    "python": "3.12.12",
+    "torch": "2.9.1",
+    "device": "mps",
+    "machine": "arm64",
+    "platform": "macOS-27.2-arm64-arm-64bit",
+    "time": "2026-11-04 01:09:52"
+  },
+  "sampler": {
+    "spacing": "leading",
+    "threshold": "dynamic",
+    "w": 1.0
+  },
+  "lams": [
+    0.0,
+    0.05,
+    0.1,
+    0.2,
+    0.4
+  ],
+  "sweep_on_validation": {
+    "0": {
+      "lam": 0.0,
+      "saturated_fraction": 0.0033333333333333335,
+      "frechet_ecg_distance": 0.8370396447776461,
+      "log_spectral_distance_db": 0.5939857363700867,
+      "limit_cycle_energy_median": 1.108093500137329,
+      "hr_control": {
+        "mae_bpm": 4.2078399658203125,
+        "measured_mean_bpm": [
+          48.53902816772461,
+          70.2979736328125,
+          89.70103454589844,
+          108.43104553222656
+        ],
+        "detectable_fraction": 1.0,
+        "rr_std_ms_median": 117.6944449543953
+      },
+      "seconds": 155.6
+    },
+    "0.05": {
+      "lam": 0.05,
+      "saturated_fraction": 0.0,
+      "frechet_ecg_distance": 0.4962669719444988,
+      "log_spectral_distance_db": 1.7073906660079956,
+      "limit_cycle_energy_median": 0.7340147495269775,
+      "hr_control": {
+        "mae_bpm": 4.073468208312988,
+        "measured_mean_bpm": [
+          48.50249481201172,
+          69.17388153076172,
+          89.33431243896484,
+          107.78360748291016
+        ],
+        "detectable_fraction": 1.0,
+        "rr_std_ms_median": 116.95816367864609
+      },
+      "seconds": 156.8
+    },
+    "0.1": {
+      "lam": 0.1,
+      "saturated_fraction": 0.0,
+      "frechet_ecg_distance": 2.170960696882728,
+      "log_spectral_distance_db": 3.834496259689331,
+      "limit_cycle_energy_median": 0.45367395877838135,
+      "hr_control": {
+        "mae_bpm": 4.18805456161499,
+        "measured_mean_bpm": [
+          48.47863006591797,
+          68.3121566772461,
+          89.99063873291016,
+          108.27408599853516
+        ],
+        "detectable_fraction": 1.0,
+        "rr_std_ms_median": 115.97707867622375
+      },
+      "seconds": 154.7
+    },
+    "0.2": {
+      "lam": 0.2,
+      "saturated_fraction": 0.0,
+      "frechet_ecg_distance": 12.34899429351158,
+      "log_spectral_distance_db": 7.517114162445068,
+      "limit_cycle_energy_median": 0.1567753404378891,
+      "hr_control": {
+        "mae_bpm": 7.908429145812988,
+        "measured_mean_bpm": [
+          48.76409149169922,
+          66.54246520996094,
+          84.56925964355469,
+          97.98753356933594
+        ],
+        "detectable_fraction": 1.0,
+        "rr_std_ms_median": 183.45044553279877
+      },
+      "seconds": 155.6
+    },
+    "0.4": {
+      "lam": 0.4,
+      "saturated_fraction": 0.0,
+      "frechet_ecg_distance": 32.1273354670168,
+      "log_spectral_distance_db": 12.963822364807129,
+      "limit_cycle_energy_median": 0.034196238964796066,
+      "hr_control": {
+        "mae_bpm": 8.82713508605957,
+        "measured_mean_bpm": [
+          54.005096435546875,
+          67.30155944824219,
+          85.47833251953125,
+          95.63297271728516
+        ],
+        "detectable_fraction": 0.99375,
+        "rr_std_ms_median": 175.63289403915405
+      },
+      "seconds": 154.0
+    }
+  },
+  "real_test_rr_std_ms_median": 23.68178591132164,
+  "selected_lam": 0.05,
+  "selection_rule": "min HR-control MAE s.t. FED(val) <= 1.10 x FED(val, lam=0) and saturated < 5 %",
+  "final_on_test": {
+    "unguided": {
+      "lam": 0.0,
+      "n": 2000,
+      "saturated_fraction": 0.0035,
+      "frechet_ecg_distance": 1.04741421870414,
+      "mmd2_embedding": 0.002963489798316954,
+      "log_spectral_distance_db": 0.36876535415649414,
+      "discriminative_score": 0.14189189189189189,
+      "tstr_auroc": 0.8269067602274812,
+      "limit_cycle_energy_median": 1.1096374988555908,
+      "hr_control": {
+        "mae_bpm": 4.117781639099121,
+        "measured_mean_bpm": [
+          48.316795349121094,
+          71.33271789550781,
+          90.17884826660156,
+          110.64582824707031
+        ],
+        "detectable_fraction": 0.996875,
+        "rr_std_ms_median": 117.31694638729095
+      }
+    },
+    "physics_guided": {
+      "lam": 0.05,
+      "n": 2000,
+      "saturated_fraction": 0.0,
+      "frechet_ecg_distance": 2.6351111072317197,
+      "mmd2_embedding": 0.007422311993235953,
+      "log_spectral_distance_db": 2.046968460083008,
+      "discriminative_score": 0.23310810810810811,
+      "tstr_auroc": 0.8292515134837645,
+      "limit_cycle_energy_median": 0.7447001338005066,
+      "hr_control": {
+        "mae_bpm": 3.9782981872558594,
+        "measured_mean_bpm": [
+          48.532596588134766,
+          70.7158432006836,
+          89.69933319091797,
+          109.96891784667969
+        ],
+        "detectable_fraction": 0.996875,
+        "rr_std_ms_median": 118.40780079364777
+      }
+    }
+  }
+}

@@ -100,3 +100,67 @@ def fem_impedance(freq: float, tm: TissueModel | None = None, ec: ElectrodeConfi
     phi = spla.spsolve(K.tocsc(), rhs)
     I = sum(Y * L * (1.0 - 0.5 * (phi[n0] + phi[n1])) for n0, n1, L in seg_A)  # A per metre
     return (1.0 / I) / ec.length
+
+
+def fem_spectrum(freqs, tm: TissueModel | None = None, ec: ElectrodeConfig | None = None, lift: float = 0.0,
+                 h: float = 0.5e-3, dz0: float = 20e-6, ratio: float = 1.2) -> np.ndarray:
+    """Impedance spectrum (ohm) at many frequencies, assembling the mesh and per-layer stiffness once.
+
+    The system matrix is linear in the material constants, K(w) = sum_l sigma*_l(w) K_l + Y(w) M_robin,
+    so each extra frequency costs only one sparse solve. Defaults are the coarse mesh, which agrees with
+    the fine mesh to ~1e-4 for the wet electrode and is what the surrogate dataset is generated with.
+    """
+    tm = tm or TissueModel()
+    ec = ec or ElectrodeConfig(kind="wet")
+    centres = (-ec.spacing / 2, ec.spacing / 2)
+    half = (ec.width * (1 - lift) / 2, ec.width / 2)
+    tops = np.cumsum([0.0] + [l.thickness for l in tm.layers])
+    xs = _nodes_x(tm.width, centres, half, h)
+    zs = _nodes_z(tm.depth, tops, dz0, ratio)
+    nx, nz = len(xs), len(zs)
+    n = nx * nz
+    idx = np.arange(n).reshape(nx, nz)
+    X, Z = np.meshgrid(xs, zs, indexing="ij")
+    P = np.stack([X.ravel(), Z.ravel()], 1)
+    a, b = idx[:-1, :-1].ravel(), idx[1:, :-1].ravel()
+    c, d = idx[1:, 1:].ravel(), idx[:-1, 1:].ravel()
+    T = np.concatenate([np.stack([a, b, c], 1), np.stack([a, c, d], 1)])
+    zc = P[T, 1].mean(1)
+    p0, p1, p2 = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    area = 0.5 * np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p2[:, 0] - p0[:, 0]) * (p1[:, 1] - p0[:, 1]))
+    bcoef = np.stack([p1[:, 1] - p2[:, 1], p2[:, 1] - p0[:, 1], p0[:, 1] - p1[:, 1]], 1)
+    ccoef = np.stack([p2[:, 0] - p1[:, 0], p0[:, 0] - p2[:, 0], p1[:, 0] - p0[:, 0]], 1)
+    Ke = (bcoef[:, :, None] * bcoef[:, None, :] + ccoef[:, :, None] * ccoef[:, None, :]) / (4 * area[:, None, None])
+    rows = np.repeat(T, 3, axis=1).ravel()
+    cols = np.tile(T, (1, 3)).ravel()
+    K_layers = []
+    for t0, t1 in zip(tops[:-1], tops[1:]):
+        m = ((zc >= t0) & (zc < t1 + 1e-15)).astype(float)
+        K_layers.append(sp.coo_matrix(((Ke * m[:, None, None]).ravel(), (rows, cols)), shape=(n, n)).tocsc())
+    top = idx[:, 0]
+    rr, cc, vv = [], [], []
+    rhs1 = np.zeros(n)
+    seg_A = []
+    for e, (cx, hw, V) in enumerate(zip(centres, half, (1.0, 0.0))):
+        for i in range(nx - 1):
+            xm = 0.5 * (xs[i] + xs[i + 1])
+            if cx - hw - 1e-12 <= xm <= cx + hw + 1e-12:
+                L = xs[i + 1] - xs[i]
+                n0, n1 = top[i], top[i + 1]
+                for (p, q, w) in ((n0, n0, 2), (n1, n1, 2), (n0, n1, 1), (n1, n0, 1)):
+                    rr.append(p); cc.append(q); vv.append(L * w / 6)
+                rhs1[n0] += L * V / 2
+                rhs1[n1] += L * V / 2
+                if e == 0:
+                    seg_A.append((n0, n1, L))
+    M = sp.coo_matrix((vv, (rr, cc)), shape=(n, n)).tocsc()
+    sc_sigma = tm.sc_sigma * tm.sc_hydration_gain
+    out = []
+    for f in np.atleast_1d(freqs):
+        om = 2 * np.pi * f
+        A = sum((l.sigma + 1j * om * EPS0 * l.eps_r) * K for l, K in zip(tm.layers, K_layers))
+        Y = (sc_sigma + 1j * om * EPS0 * tm.sc_eps_r) / tm.sc_thickness
+        phi = spla.spsolve((A + Y * M).tocsc(), Y * rhs1)
+        I = sum(Y * L * (1.0 - 0.5 * (phi[n0] + phi[n1])) for n0, n1, L in seg_A)
+        out.append((1.0 / I) / ec.length)
+    return np.array(out)

@@ -41,7 +41,10 @@ muscle-artifact and baseline-wander noise. Every number below comes from
 | `pinn/ecg_pinn.py` | **Inverse PINN.** A Fourier-feature MLP for the clean ECG, a low-order baseline model, and learnable ODE parameters, trained with data fit + autograd ODE residual at stochastic collocation points. Many segments are solved in parallel with batched (einsum) MLP weights. It includes a hard-constraint differentiable-simulation ablation. |
 | `diffusion/` | 1-D U-Net (FiLM conditioning on diffusion time, diagnostic class and heart rate, self-attention at the bottleneck), cosine-schedule DDPM, DDIM sampler, classifier-free guidance, EMA. |
 | `eval/` | Fréchet ECG distance and MMD² on classifier embeddings, Welch log-spectral distance, heart-rate Wasserstein distance, discriminative score, train-on-synthetic-test-on-real (TSTR), and the downstream train/eval loop. |
-| `experiments/` | `run_multiphysics`, `run_calibration`, `run_pinn`, `run_diffusion`, `run_downstream`, `run_sensor_ablation`, orchestrated by `run_all` (with `smoke` and `full` profiles). |
+| `multiphysics/electrode_skin_fem.py` | Independent P1 finite-element solver (contact-impedance Robin condition) used to cross-check the finite-volume solver; `fem_spectrum` assembles once and re-solves per frequency for dataset generation. |
+| `surrogate/` | **Neural surrogate** of the FE electrode simulator: parameter space and Latin-hypercube sampling, parallel FE dataset generation, a physics-informed (analytic contact prior + learned correction) deep ensemble with β-NLL variance heads, and robust electrode design by projected gradient ascent through the surrogate. |
+| `diffusion/physics_guidance.py` | Limit-cycle guidance energy from the ECG ODE, applied to the sampler's x̂₀ estimate (an ablation; see results §8). |
+| `experiments/` | `run_multiphysics`, `run_calibration`, `run_pinn`, `run_diffusion`, `run_downstream`, `run_sensor_ablation`, `run_guidance`, `run_driving`, `run_fem_crosscheck`, `run_physics_guidance`, `run_surrogate`, `run_design`, `run_scaling`, orchestrated by `run_all` (with `smoke` and `full` profiles). |
 
 ## Protocol (no leakage)
 
@@ -98,7 +101,7 @@ are on the held-out test fold (`guidance_results.json`, `fig_samples_wsel.png`).
 | diffusion, simulation-pretrained + 10 % real | 0.2 % | 2.01 | 0.0064 | 2.34 | 0.711 | 0.825 |
 
 * A classifier trained **only on generated ECG** reaches **0.829 AUROC**; one trained on the real training data gets 0.801.
-* Heart-rate conditioning: requested 50/70/90/110 bpm → measured 57/78/95/110 bpm (MAE 9.6 bpm; original sampler).
+* Heart-rate conditioning: MAE **4.1 bpm** with the fixed sampler (320 test samples requested at 50/70/90/110 bpm; `physics_guidance_results.json`). The original sampler gave 9.6 bpm (57/78/95/110 measured).
 * With the fixed sampler, diffusion samples + sensor-model augmentation give **0.838 ± 0.001 clean / 0.834 ± 0.003 at 6 dB / 0.827 ± 0.003 at 0 dB**, the best result in the study.
 * With the original (broken) sampler, simulation pre-training reduced the 10 %-data model's Fréchet distance 2.5× (107 → 43). That comparison was not repeated with the fixed sampler, because the 10 %-real-only model was not re-scored. Treat it as indicative only.
 
@@ -122,7 +125,7 @@ so compare distances within a table, not across tables.
   It predicts 21.5 kΩ (gel) vs 443 kΩ (dry) at 10 Hz, near-zero pressure sensitivity for gel but κ ≈ 0.4 for dry electrodes, and lift-off sensitivity κ ≈ 0.6.
 * **Independent finite-element check:** `multiphysics/electrode_skin_fem.py` (P1 triangles, contact-impedance Robin condition) agrees with the finite-volume solver to 0.46 % max / 0.10 % mean in |Z| over 1 Hz–10 kHz, with phase within 0.14° and an identical 11.9 % rise at 20 % lift-off (`fem_crosscheck.json`, `fig_fem_crosscheck.png`).
 <!-- COMSOL-CHECK:BEGIN -->
-* **COMSOL cross-check:** not run yet. See the [step-by-step guide](multiphysics/comsol/README.md); `python -m sensing_gen.multiphysics.compare_comsol` fills this line with the measured agreement.
+* **COMSOL:** the configuration can be rebuilt in COMSOL with the [step-by-step guide](multiphysics/comsol/README.md) and compared with `python -m sensing_gen.multiphysics.compare_comsol`. Results obtained under COMSOL evaluation licences are not published here, per their terms.
 <!-- COMSOL-CHECK:END -->
 * **Negative result.** Widening the sensor model's priors to the multiphysics range did *not* help (0 dB AUROC 0.801 ± 0.013 vs 0.818 ± 0.007). The augmentation benefit is robust to the exact priors.
 
@@ -153,6 +156,57 @@ The values are output SNR in dB on 16 test records.
 On simulated data with known parameters, the PINN recovers P/T-wave strength within 4–9 % and timing within 0.03 rad, and raises SNR from 9.0 to 11.7 dB. QRS strength is poorly identifiable at 100 Hz (35 % error).
 On real data the physics prior pays off only when noise dominates. At higher SNR, a five-event single-template ODE cannot represent all real morphology, so plain filtering wins.
 
+### 6. Neural surrogate of the electrode simulator
+
+The FE solver (`fem_spectrum`) generates 4,000 training, 1,000 test and 300 out-of-range impedance spectra (21 frequencies, 1 Hz–10 kHz) over 10 parameters sampled by Latin hypercube: dermis and fat thickness; dermis, fat and muscle conductivity; stratum-corneum conductivity and permittivity (log-uniform); electrode width and spacing; lift-off. Targets are log10|Z| and phase. Models are 5-member MLP deep ensembles with mean and log-variance heads (MSE warm-up, then β-NLL, β = 0.5). The **hybrid** model predicts only the correction to the analytic contact impedance Z_c = (1/w_A + 1/w_B)/(L·Y_sc).
+
+| model (1,000 held-out spectra) | median \|Z\| error | p95 \|Z\| error | median phase error | 95 % interval coverage |
+|---|---|---|---|---|
+| analytic contact prior only | 8.71 % | 47.24 % | 0.821° | – |
+| quadratic ridge, plain / hybrid | 1.67 % / 0.74 % | 7.09 % / 3.50 % | 0.658° / 0.046° | – |
+| deep ensemble, plain | 0.10 % | 0.39 % | 0.009° | 0.99 |
+| **deep ensemble, hybrid** | **0.02 %** | **0.24 %** | **0.002°** | 0.98 |
+
+| FE training simulations | 250 | 500 | 1,000 | 2,000 | 4,000 |
+|---|---|---|---|---|---|
+| plain ensemble, median \|Z\| error | 0.46 % | 0.20 % | 0.13 % | 0.11 % | 0.10 % |
+| hybrid ensemble | **0.11 %** | **0.05 %** | **0.03 %** | **0.02 %** | **0.02 %** |
+
+* The hybrid error matches the FE discretisation floor (coarse vs fine mesh, 0.015 % median), so more data cannot help further without a finer solver.
+* Out of range (each range widened 25 %): error 0.16 % with ensemble σ 4.1× larger; σ and actual error are rank-correlated (`fig_surrogate.png`).
+* 325 ms per FE spectrum vs 8.6 µs per surrogate spectrum (batched, CPU): 37,714× faster.
+
+### 7. Robust electrode design through the surrogate
+
+Objective: J(w, s) = E[ln s − ½ ln Re Z(10 Hz)] over 512 tissue/lift-off states (signal grows with spacing, thermal noise with √Re Z; +1 in J is +8.7 dB), with s + w ≤ 35 mm and s − w ≥ 5 mm. Projected Adam on (w, s) from three starts, back-propagating through the surrogate; every design is then re-scored with the FE solver on 48 *independent* tissues.
+
+| design | w, s (mm) | FE objective J | vs FE grid optimum |
+|---|---|---|---|
+| FE brute-force grid (66 designs) | 11.0, 24.0 | −8.686 | – |
+| surrogate gradient optimum | 9.1, 25.9 | −8.702 | −0.13 dB |
+| common layout | 10.0, 25.0 | −8.691 | −0.04 dB |
+| "maximise spacing" heuristic | 5.0, 30.0 | −8.841 | −1.34 dB |
+
+The surrogate finds the right region in 13 s; the optimum is flat, so its 0.13 dB regret reflects surrogate error at the 10⁻⁴ level of J. The robust and nominal-tissue optima coincide. The design lesson is the heuristic's 1.3 dB loss.
+
+### 8. Physics-informed limit-cycle guidance (negative result)
+
+Guidance energy E = ¼ Σ (x(t) − x(t+τ))², τ = 60 fs/HR, applied as x̂₀ ← x̂₀ − λ(x̂₀ − P_τ x̂₀) at every DDIM step. λ ∈ {0, 0.05, 0.1, 0.2, 0.4} swept on validation; λ = 0.05 selected (Fréchet 0.84 → 0.50 on 300 validation samples).
+On the test fold it did **not** hold: Fréchet 1.05 → 2.64, log-spectral distance 0.37 → 2.05 dB, HR-control MAE 4.12 → 3.98 bpm, TSTR 0.827 → 0.829. λ ≥ 0.2 collapses fidelity (Fréchet 12–32). Averaging beats one nominal period apart blurs the QRS because real RR intervals vary (RR std ≈ 120 ms). A phase-aware projection (aligning to detected beats) would be the next attempt.
+
+### 9. How much real data does synthetic data replace?
+
+10 % real training data plus N synthetic records, against real-only training at 10/25/50/100 %; sensor-model augmentation in every run; 3 seeds; generators trained on the 10 % subset only (`scaling_results.json`, `fig_scaling.png`).
+
+| training data | clean AUROC | 0 dB real-noise AUROC |
+|---|---|---|
+| 10 % / 25 % / 50 % / 100 % real only | 0.809 / 0.798 / 0.808 / 0.824 | 0.790 / 0.781 / 0.786 / 0.802 |
+| 10 % real + 500 / 1k / 2k / 4k / 8k physics-simulator ECG | 0.791 / 0.784 / 0.785 / 0.799 / 0.792 | 0.780 / 0.773 / 0.771 / 0.783 / 0.779 |
+| 10 % real + 500 / 1k / 2k / 4k / **8k** diffusion ECG | 0.807 / 0.802 / 0.793 / 0.809 / **0.822** | 0.781 / 0.779 / 0.771 / 0.788 / **0.803** |
+
+* With 8,000 generated records, 10 % real data matches 100 % real data (0.822 vs 0.824 clean; 0.803 vs 0.802 at 0 dB). Smaller generated sets do not, and simulator samples never help here.
+* The real-only curve is flat from 10 % to 50 % once sensor augmentation is on, and the seed spread is about ±0.01. Read this as "generation at scale recovers the last real-data gain", not as an exact exchange rate.
+
 ## Reproduce
 
 ```bash
@@ -160,6 +214,7 @@ bash scripts/run_sensing_gen.sh smoke   # download + tests + 3-minute smoke pass
 bash scripts/run_sensing_gen.sh full    # full run (~4 h on an Apple M-series laptop, MPS)
 python -m sensing_gen.data.download --drivedb-only
 python -m sensing_gen.experiments.run_all multiphysics sensor_ablation guidance driving   # follow-up steps
+python -m sensing_gen.experiments.run_all fem_crosscheck physics_guidance surrogate design scaling   # surrogate, design, scaling
 python -m pytest -q tests/test_sensing_gen.py
 ```
 
@@ -169,8 +224,8 @@ python -m pytest -q tests/test_sensing_gen.py
   chest-strap wearable. NSTDB noise is real, but it was recorded on stationary subjects.
 * The multiphysics model is 2-D (per unit electrode length) and uses nominal literature tissue
   properties. Contact mechanics is treated quasi-statically with closed-form layer compression, not
-  a full 3-D elasticity solve. It is written from scratch in Python/SciPy (finite volume), not
-  COMSOL. The workflow (geometry → coupled physics → verified solve → parameter sweep → export to
+  a full 3-D elasticity solve. It is written from scratch in Python/SciPy (finite volume, with an
+  independent finite-element check), not COMSOL. The workflow (geometry → coupled physics → verified solve → parameter sweep → export to
   the ML pipeline) is the same one a COMSOL model would sit in.
 * The ODE describes one lead with five Gaussian events. Beat-to-beat morphology changes and
   multi-lead geometry are outside the model, which is exactly where the diffusion model and the

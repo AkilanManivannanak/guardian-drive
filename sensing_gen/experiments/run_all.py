@@ -13,7 +13,8 @@ import importlib
 
 from .common import get_profile, out_dir
 
-STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving", "fem_crosscheck"]
+STEPS = ["multiphysics", "calibration", "pinn", "diffusion", "downstream", "sensor_ablation", "guidance", "driving", "fem_crosscheck",
+         "physics_guidance", "surrogate", "design", "scaling"]
 
 
 def fmt(m):
@@ -141,6 +142,53 @@ def write_report(od):
         for k, v in d.get("bootstrap_vs_real", {}).items():
             L.append(f"\n{k}: change in in-car false alarms vs real-only {v['delta_false_alarm']:+.3f} "
                      f"(95 % driver-bootstrap CI {v['ci95'][0]:+.3f} to {v['ci95'][1]:+.3f})")
+        L.append("")
+    p = od / "physics_guidance_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Physics-informed (limit-cycle) guidance for the diffusion sampler (no retraining)", "",
+              f"Selected on validation: λ = {d.get('selected_lam', '–')}", "",
+              "| sampler | HR-control MAE (bpm) ↓ | FED ↓ | MMD² ↓ | LSD dB ↓ | disc. ↓ | TSTR AUROC ↑ |",
+              "|---|---|---|---|---|---|---|"]
+        for k, r in d.get("final_on_test", {}).items():
+            L.append(f"| {k} (λ={r['lam']:g}) | {r['hr_control']['mae_bpm']:.2f} | {r['frechet_ecg_distance']:.2f} | "
+                     f"{r['mmd2_embedding']:.4f} | {r['log_spectral_distance_db']:.2f} | "
+                     f"{r['discriminative_score']:.3f} | {r['tstr_auroc']:.3f} |")
+        L.append("")
+    p = od / "surrogate_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Neural surrogate of the electrode simulator (held-out FE spectra)", "",
+              "| model | median abs(Z) error | p95 abs(Z) error | median phase error | 95 % coverage |", "|---|---|---|---|---|"]
+        for k, r in d["models"].items():
+            cov = f"{r['coverage_95']:.2f}" if "coverage_95" in r else "–"
+            L.append(f"| {k} | {100 * r['absZ_rel_err_median']:.2f} % | {100 * r['absZ_rel_err_p95']:.2f} % | "
+                     f"{r['phase_err_deg_median']:.3f}° | {cov} |")
+        if "speed" in d:
+            L += ["", f"Speed: {d['speed']['speedup']:,.0f}x faster than the FE solver per spectrum."]
+        L.append("")
+    p = od / "design_results.json"
+    if p.exists():
+        d = json.loads(p.read_text())
+        L += ["## Robust electrode design through the differentiable surrogate (verified by FE)", "",
+              "| design | w (mm) | s (mm) | FE objective J | SNR vs max-spacing | regret vs FE grid |", "|---|---|---|---|---|---|"]
+        for k, r in d["designs"].items():
+            L.append(f"| {k} | {r['w_mm']:.2f} | {r['s_mm']:.2f} | {r['J_fe_mean']:.4f} | "
+                     f"{r['snr_gain_db_vs_max_spacing']:+.2f} dB | {r['regret_vs_fe_grid']:.4f} |")
+        L += ["", f"Surrogate optimisation {d['surrogate_opt_seconds']:.1f} s vs FE grid search {d['fe_grid_seconds']:.0f} s.", ""]
+    p = od / "scaling_results.json"
+    if p.exists() and json.loads(p.read_text()).get("synthetic"):
+        d = json.loads(p.read_text())
+        L += ["## How much real data does synthetic data replace? (sensor-model augmentation in all runs)", "",
+              "| training data | clean AUROC | ≈ real data | NSTDB 0 dB AUROC | ≈ real data |", "|---|---|---|---|---|"]
+        for f in d["fractions"]:
+            r = d["real_only"][f"{f:g}"]
+            L.append(f"| {100 * f:.0f} % real only | {fmt(r['clean'])} | – | {fmt(r['nstdb_0dB'])} | – |")
+        for name, rows in d["synthetic"].items():
+            for n, r in rows.items():
+                e = r["equivalent_real_fraction"]
+                L.append(f"| 10 % real + {n} {name} | {fmt(r['clean'])} | {100 * e['clean']:.0f} % | "
+                         f"{fmt(r['nstdb_0dB'])} | {100 * e['nstdb_0dB']:.0f} % |")
         L.append("")
     (od / "RESULTS.md").write_text("\n".join(L))
     print("\n".join(L))

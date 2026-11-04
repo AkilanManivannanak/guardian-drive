@@ -33,13 +33,15 @@
   <img alt="Broken diffusion samples: 40% to 0.5%" src="https://img.shields.io/badge/broken%20diffusion%20samples-40%25%20%E2%86%92%200.5%25-eb6834?style=for-the-badge">
   <img alt="Train on synthetic, test on real AUROC 0.829" src="https://img.shields.io/badge/train%20on%20synthetic%20AUROC-0.829%20vs%200.801%20real-1baf7a?style=for-the-badge">
   <img alt="Physics model fitted to 3,907 real heartbeats, R squared 0.95" src="https://img.shields.io/badge/physics%20fit-3%2C907%20beats%2C%20R%C2%B2%200.95-52514e?style=for-the-badge">
+  <img alt="Neural surrogate of the electrode simulator: 0.02% error, 37,714 times faster" src="https://img.shields.io/badge/neural%20surrogate-0.02%25%20error%2C%2037%2C714%C3%97%20faster-7c3aed?style=for-the-badge">
+  <img alt="10% real data plus 8,000 diffusion samples matches 100% real data" src="https://img.shields.io/badge/10%25%20real%20%2B%208k%20generated-%E2%89%88%20100%25%20real%20data-d6336c?style=for-the-badge">
 </p>
 
 | If you have… | Start here |
 |---|---|
 | 1 minute | the [interactive explorer](https://akilalours.github.io/guardian-drive/docs/explorer.html) and the two animations below |
 | 5 minutes | [Headline results](#headline-results) and the expandable experiment cards |
-| 15 minutes | the [4-page technical report](docs/sensing_gen_report.pdf) |
+| 15 minutes | the [technical report](docs/sensing_gen_report.pdf) |
 | an afternoon | `bash scripts/run_sensing_gen.sh` reproduces everything on a laptop |
 
 ---
@@ -62,6 +64,9 @@ The most role-relevant work is [`sensing_gen/`](sensing_gen/): simulation and ge
 | Train-on-synthetic-test-on-real (diffusion) vs train-on-real | **0.829** vs 0.801 AUROC | same |
 | Differentiable ECG simulator calibrated to real beats | **3,907 beats, median R² 0.951** | [`calibration_results.json`](outputs/sensing_gen/calibration_results.json) |
 | Electrode–skin multiphysics FV solver: analytic check and independent FE check | error **2×10⁻⁴** (analytic), **≤ 0.46 %** vs finite elements; wet 21.5 kΩ vs dry 443 kΩ at 10 Hz | [`multiphysics_results.json`](outputs/sensing_gen/multiphysics_results.json) |
+| **Neural surrogate** of the electrode FE simulator (physics prior + deep ensemble), 1,000 held-out spectra | median \|Z\| error **0.02 %** (5× better than a plain network), **37,714× faster**, 95 % intervals cover 98 %, uncertainty rises 4× outside the training range | [`surrogate_results.json`](outputs/sensing_gen/surrogate_results.json) |
+| **How much real data does generation replace?** 10 % real + 8,000 diffusion samples (generator trained on the same 10 %) vs 100 % real | AUROC **0.822 vs 0.824** clean, **0.803 vs 0.802** at 0 dB; physics-simulator samples alone do not help | [`scaling_results.json`](outputs/sensing_gen/scaling_results.json) |
+| Electrode design by gradient descent through the surrogate, checked with the FE solver | within **0.13 dB** of the brute-force FE optimum; the "maximise spacing" layout loses **1.3 dB** | [`design_results.json`](outputs/sensing_gen/design_results.json) |
 | Inverse PINN, real ECG + real noise at 0 dB | **7.7 dB** vs 6.3 dB band-pass (filtering wins at ≥ 6 dB) | [`pinn_results.json`](outputs/sensing_gen/pinn_results.json) |
 | Real in-car ECG (PhysioNet drivedb, 18 drives), false cardiac alarms at a 10 % design rate | **13.9 %** (transfers); augmentation gives no further gain (driver-bootstrap CIs include 0) | [`driving_results.json`](outputs/sensing_gen/driving_results.json) |
 | CARLA 0.9.15, 7 town scenarios | **320 → 2** collisions vs no intervention | [`carla_real_evaluation_results.json`](outputs/carla_real_evaluation_results.json) |
@@ -89,6 +94,10 @@ to *measure* whether the extra data helps:
 * **Multiphysics electrode model.** Contact mechanics coupled to an electro-quasi-static
   finite-volume solver for layered tissue, verified against an analytic solution. It predicts
   wet vs dry electrode impedance and motion sensitivity.
+* **Neural surrogate + design.** A physics-informed deep ensemble learns the finite-element
+  electrode simulator over 10 tissue/contact/geometry parameters (0.02 % error, 37,714× faster,
+  calibrated uncertainty), then drives gradient-based robust electrode design checked against the FE solver.
+* **Scaling study.** Measures how much real data simulated and generated ECG actually replace.
 * **Evaluation.** Fréchet / MMD / spectral / heart-rate fidelity, discriminative score,
   train-on-synthetic-test-on-real, and downstream AUROC under *real* recorded sensor noise
   (MIT-BIH NSTDB, held-out half).
@@ -110,7 +119,9 @@ flowchart LR
     R --> F["ECG classifier"]
     C -->|"pre-training (10 % data)"| E
     C --> P["Inverse PINN<br/>denoising + parameters"]
-    M["Multiphysics electrode model<br/>contact mechanics + EQS FV"] -->|"checks priors"| S["Physics sensor model<br/>motion, impedance, mains, EMG"]
+    M["Multiphysics electrode model<br/>contact mechanics + EQS FV / FE"] -->|"checks priors"| S["Physics sensor model<br/>motion, impedance, mains, EMG"]
+    M -->|"4,000 FE spectra"| SU["Neural surrogate<br/>physics prior + deep ensemble"]
+    SU -->|"gradients"| D["Robust electrode design<br/>verified by FE"]
     S -->|"on-the-fly augmentation"| F
     E -->|"synthetic ECG"| F
     F --> G{{"Evaluation"}}
@@ -170,7 +181,7 @@ Guidance was ruled out by a sweep (still 39 % broken at w = 0). Root cause: DDIM
 * Null result: multiphysics-derived sensor priors did not improve the classifier (0.801 vs 0.818 at 0 dB).
 
 <!-- COMSOL-CHECK:BEGIN -->
-**COMSOL cross-check:** not run yet. The [step-by-step guide](sensing_gen/multiphysics/comsol/README.md) and `python -m sensing_gen.multiphysics.compare_comsol` will fill this line with the measured agreement.
+**COMSOL:** the same configuration can be rebuilt in COMSOL Multiphysics with the [step-by-step guide](sensing_gen/multiphysics/comsol/README.md) and compared with `python -m sensing_gen.multiphysics.compare_comsol`. Results obtained under COMSOL evaluation licences are not published here, per their terms.
 <!-- COMSOL-CHECK:END -->
 </details>
 
@@ -192,6 +203,69 @@ Guidance was ruled out by a sweep (still 39 % broken at w = 0). Root cause: DDIM
 | 12 dB | **21.0 dB** | 16.3 dB | 8.4 dB |
 
 On simulated data the PINN recovers P/T-wave parameters within 4–9 %. [`pinn_results.json`](outputs/sensing_gen/pinn_results.json)
+</details>
+
+<details>
+<summary><b>6 · Neural surrogate:</b> the FE electrode simulator learned to 0.02 % error, 37,714× faster, with calibrated uncertainty</summary>
+
+<img src="outputs/sensing_gen/fig_surrogate.png" alt="Surrogate data efficiency, held-out spectra with uncertainty bands, and ensemble uncertainty against actual error" width="100%">
+
+4,000 finite-element impedance spectra (21 frequencies, 1 Hz–10 kHz) over 10 parameters: layer thicknesses and conductivities, stratum-corneum conductivity and permittivity, electrode width and spacing, lift-off. The **hybrid** model learns only the correction to an analytic contact-impedance prior; the plain model learns the whole spectrum. Both are 5-member deep ensembles with β-NLL variance heads.
+
+| model (1,000 held-out spectra) | median \|Z\| error | p95 | median phase error | 95 % coverage |
+|---|---|---|---|---|
+| analytic contact prior alone | 8.71 % | 47.2 % | 0.82° | – |
+| quadratic ridge | 1.67 % | 7.09 % | 0.66° | – |
+| plain deep ensemble | 0.10 % | 0.39 % | 0.009° | 0.99 |
+| **hybrid (physics prior + ensemble)** | **0.02 %** | **0.24 %** | **0.002°** | 0.98 |
+
+* The error sits at the FE solver's own discretisation level (coarse vs fine mesh: 0.015 % median).
+* Data efficiency: with 500 simulations the hybrid model (0.05 %) beats the plain model trained on 4,000 (0.10 %).
+* Out of range (every parameter range widened 25 %): error rises to 0.16 % and the ensemble's σ rises 4.1×, so it flags extrapolation.
+* 325 ms per FE spectrum vs 8.6 µs per surrogate spectrum: **37,714× faster**. [`surrogate_results.json`](outputs/sensing_gen/surrogate_results.json)
+</details>
+
+<details>
+<summary><b>7 · Design:</b> gradient-based robust electrode design through the surrogate, verified by FE (within 0.13 dB of the optimum)</summary>
+
+<img src="outputs/sensing_gen/fig_design.png" alt="FE objective over electrode width and spacing with the surrogate optimum and the FE grid optimum" width="60%">
+
+Maximise an SNR proxy, E[ln s − ½ ln Re Z(10 Hz)], over electrode width w and spacing s, under a 35 mm patch budget and a 5 mm gap, averaged over 512 tissue and lift-off states. Projected Adam through the surrogate finds w = 9.1 mm, s = 25.9 mm; brute-force FE search over 66 designs × 48 held-out tissues finds w = 11, s = 24.
+
+* FE-evaluated regret of the surrogate design: **0.13 dB**. The landscape is flat near the optimum; a common 10/25 mm layout is within 0.04 dB.
+* The "maximise spacing" heuristic (5/30 mm) loses **1.3 dB**: wider electrodes cut contact impedance faster than shorter spacing cuts signal.
+* Robust (population) and nominal-tissue designs coincide here, so tissue variability does not move this optimum. [`design_results.json`](outputs/sensing_gen/design_results.json)
+</details>
+
+<details>
+<summary><b>8 · Scaling:</b> 10 % real data + 8,000 generated ECG matches 100 % real; the simulator alone does not</summary>
+
+<img src="outputs/sensing_gen/fig_scaling.png" alt="AUROC against number of synthetic records added to 10 % real data, compared with real-only training at 10, 25, 50 and 100 %" width="100%">
+
+Every run uses the physics sensor-model augmentation, the same classifier and 3 seeds. The generators (calibrated simulator, simulation-pretrained diffusion) only ever saw the 10 % subset.
+
+| training data | clean AUROC | 0 dB real-noise AUROC |
+|---|---|---|
+| 10 % real | 0.809 ± 0.003 | 0.790 ± 0.007 |
+| 100 % real | 0.824 ± 0.011 | 0.802 ± 0.014 |
+| 10 % real + 8,000 physics-simulator ECG | 0.792 ± 0.010 | 0.779 ± 0.012 |
+| **10 % real + 8,000 diffusion ECG** | **0.822 ± 0.004** | **0.803 ± 0.010** |
+
+* Only the largest diffusion set closes the gap; 500–4,000 samples do not, and the simulator's samples never do (its beats are too regular: log-spectral distance 9 dB).
+* Caveat: with sensor augmentation, real-only AUROC is flat from 10 % to 50 % real, and seed spread is about ±0.01, so treat "≈ 100 % real" as a 3-seed result, not a precise exchange rate. [`scaling_results.json`](outputs/sensing_gen/scaling_results.json)
+</details>
+
+<details>
+<summary><b>9 · Negative result:</b> physics-informed limit-cycle guidance for the diffusion sampler did not help</summary>
+
+The McSharry ODE is a limit cycle, so a sample conditioned on heart rate HR should repeat every 60/HR s. Guidance pushes the sampler's x̂₀ toward that, x̂₀ ← x̂₀ − λ(x̂₀ − P_τ x̂₀), with no retraining ([`physics_guidance.py`](sensing_gen/diffusion/physics_guidance.py)).
+
+| test fold (λ chosen on validation) | HR-control MAE | Fréchet dist. ↓ | log-spectral dist. ↓ | TSTR AUROC |
+|---|---|---|---|---|
+| unguided (fixed sampler) | 4.12 bpm | **1.05** | **0.37 dB** | 0.827 |
+| guided, λ = 0.05 | 3.98 bpm | 2.64 | 2.05 dB | 0.829 |
+
+The validation gain (Fréchet 0.84 → 0.50 on 300 samples) did not hold on the test fold, and λ ≥ 0.2 collapses fidelity: averaging beats one period apart blurs the QRS because real RR intervals vary. The useful by-product: the fixed sampler already controls heart rate to **4.1 bpm** (the original sampler: 9.6). [`physics_guidance_results.json`](outputs/sensing_gen/physics_guidance_results.json)
 </details>
 
 ## Visual tour

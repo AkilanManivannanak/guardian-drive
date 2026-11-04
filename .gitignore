@@ -73,3 +73,7 @@ state_machine.py.new
 
 # keep the sensing_gen data-loading package (the rule "data/" above matches any directory named data)
 !sensing_gen/data/
+
+# COMSOL evaluation-license results must not be published
+outputs/sensing_gen/comsol_comparison.json
+outputs/sensing_gen/fig_comsol.png

@@ -8,6 +8,8 @@ import math
 import torch
 import torch.nn as nn
 
+from .physics_guidance import limit_cycle_residual
+
 
 def cosine_alpha_bar(T: int, s: float = 0.008) -> torch.Tensor:
     t = torch.linspace(0, T, T + 1, dtype=torch.float64) / T
@@ -50,8 +52,12 @@ class GaussianDiffusion(nn.Module):
     def ddim_sample(self, n: int, length: int, y: torch.Tensor, hr: torch.Tensor, steps: int = 50,
                     w: float = 2.0, eta: float = 0.0, gen: torch.Generator | None = None,
                     clip: float | None = 12.0, spacing: str = "trailing",
-                    threshold: str = "static") -> torch.Tensor:
+                    threshold: str = "static", phys: float = 0.0, fs: float = 100.0) -> torch.Tensor:
         """DDIM sampler.
+
+        phys > 0 applies physics-informed limit-cycle guidance (see physics_guidance.py) to the x0
+        estimate at every step: x0 <- x0 - phys * (x0 - P_tau x0), tau = one RR interval at the
+        conditioned heart rate. phys = 0 reproduces the unguided sampler exactly.
 
         spacing="trailing" starts at t = T-1, where the cosine schedule has alpha_bar ~ 1e-9, so the
         x0 estimate amplifies epsilon errors by ~2e4. "leading" (t = T - T/steps, ..., 0) starts
@@ -70,6 +76,10 @@ class GaussianDiffusion(nn.Module):
             ab = self.ab[t]
             ab_prev = self.ab[ts[i + 1]] if i + 1 < len(ts) else torch.tensor(1.0, device=dev)
             x0 = (x - (1 - ab).sqrt() * eps) / ab.sqrt()
+            if phys > 0:
+                x0 = x0 - phys * limit_cycle_residual(x0, hr, fs)
+                if clip is None:
+                    eps = (x - ab.sqrt() * x0) / (1 - ab).sqrt()
             if clip is not None:
                 if threshold == "dynamic":
                     s = torch.quantile(x0.abs().flatten(1).float().cpu(), 0.995, dim=1).clamp(4.0, clip).to(dev)

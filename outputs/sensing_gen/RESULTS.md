@@ -100,6 +100,10 @@ HR control MAE: 9.61 bpm (measured 57.1, 77.9, 95.4, 110.0 for requested 50/70/9
 | 100pct_real | real+diffusion(w_sel) | 0.834 ± 0.007 | 0.811 ± 0.014 | 0.745 ± 0.028 |
 | 100pct_real | real+diffusion(w_sel)+sensor_model_aug | 0.838 ± 0.001 | 0.834 ± 0.003 | 0.827 ± 0.003 |
 
+## Independent finite-element cross-check of the electrode solver
+
+P1 finite elements vs finite volume, wet electrode, 1 Hz–10 kHz: max |Z| difference 0.46 % (mean 0.10 %), phase within 0.14°; 20 % lift-off raises |Z| 11.92 % (FE) vs 11.92 % (FV).
+
 ## Real in-car ECG (PhysioNet drivedb): false cardiac alarms at 90 % validation specificity
 
 18 drives, 7995 ten-second windows (1.00 with detectable beats).
@@ -116,3 +120,55 @@ real+sensor_model_aug: change in in-car false alarms vs real-only +0.015 (95 % d
 real+nstdb_noise_aug(reference): change in in-car false alarms vs real-only +0.022 (95 % driver-bootstrap CI -0.007 to +0.062)
 
 real+diffusion(fixed)+sensor_model_aug: change in in-car false alarms vs real-only +0.035 (95 % driver-bootstrap CI -0.013 to +0.111)
+
+## Physics-informed (limit-cycle) guidance for the diffusion sampler (no retraining)
+
+Selected on validation: λ = 0.05
+
+| sampler | HR-control MAE (bpm) ↓ | FED ↓ | MMD² ↓ | LSD dB ↓ | disc. ↓ | TSTR AUROC ↑ |
+|---|---|---|---|---|---|---|
+| unguided (λ=0) | 4.12 | 1.05 | 0.0030 | 0.37 | 0.142 | 0.827 |
+| physics_guided (λ=0.05) | 3.98 | 2.64 | 0.0074 | 2.05 | 0.233 | 0.829 |
+
+## Neural surrogate of the electrode simulator (held-out FE spectra)
+
+| model | median abs(Z) error | p95 abs(Z) error | median phase error | 95 % coverage |
+|---|---|---|---|---|
+| quadratic_ridge_plain | 1.67 % | 7.09 % | 0.658° | – |
+| quadratic_ridge_hybrid | 0.74 % | 3.50 % | 0.046° | – |
+| analytic_contact_prior_only | 8.71 % | 47.24 % | 0.821° | – |
+| ensemble_plain | 0.10 % | 0.39 % | 0.009° | 0.99 |
+| ensemble_hybrid | 0.02 % | 0.24 % | 0.002° | 0.98 |
+
+Speed: 37,714x faster than the FE solver per spectrum.
+
+## Robust electrode design through the differentiable surrogate (verified by FE)
+
+| design | w (mm) | s (mm) | FE objective J | SNR vs max-spacing | regret vs FE grid |
+|---|---|---|---|---|---|
+| surrogate_robust | 9.07 | 25.93 | -8.7017 | +1.21 dB | 0.0154 |
+| surrogate_nominal_tissue | 9.08 | 25.92 | -8.7017 | +1.21 dB | 0.0153 |
+| fe_grid_best | 11.00 | 24.00 | -8.6864 | +1.34 dB | 0.0000 |
+| common_w10_s25 | 10.00 | 25.00 | -8.6914 | +1.30 dB | 0.0051 |
+| max_spacing_w5_s30 | 5.00 | 30.00 | -8.8409 | +0.00 dB | 0.1545 |
+
+Surrogate optimisation 12.8 s vs FE grid search 58 s.
+
+## How much real data does synthetic data replace? (sensor-model augmentation in all runs)
+
+| training data | clean AUROC | ≈ real data | NSTDB 0 dB AUROC | ≈ real data |
+|---|---|---|---|---|
+| 10 % real only | 0.809 ± 0.003 | – | 0.790 ± 0.007 | – |
+| 25 % real only | 0.798 ± 0.002 | – | 0.781 ± 0.003 | – |
+| 50 % real only | 0.808 ± 0.005 | – | 0.786 ± 0.005 | – |
+| 100 % real only | 0.824 ± 0.011 | – | 0.802 ± 0.014 | – |
+| 10 % real + 500 simulator | 0.791 ± 0.005 | 10 % | 0.780 ± 0.004 | 10 % |
+| 10 % real + 1000 simulator | 0.784 ± 0.006 | 10 % | 0.773 ± 0.003 | 10 % |
+| 10 % real + 2000 simulator | 0.785 ± 0.005 | 10 % | 0.771 ± 0.007 | 10 % |
+| 10 % real + 4000 simulator | 0.799 ± 0.008 | 10 % | 0.783 ± 0.003 | 10 % |
+| 10 % real + 8000 simulator | 0.792 ± 0.010 | 10 % | 0.779 ± 0.012 | 10 % |
+| 10 % real + 500 sim_pretrained_diffusion | 0.807 ± 0.005 | 10 % | 0.781 ± 0.003 | 10 % |
+| 10 % real + 1000 sim_pretrained_diffusion | 0.802 ± 0.008 | 10 % | 0.779 ± 0.011 | 10 % |
+| 10 % real + 2000 sim_pretrained_diffusion | 0.793 ± 0.011 | 10 % | 0.771 ± 0.025 | 10 % |
+| 10 % real + 4000 sim_pretrained_diffusion | 0.809 ± 0.010 | 50 % | 0.788 ± 0.008 | 10 % |
+| 10 % real + 8000 sim_pretrained_diffusion | 0.822 ± 0.004 | 89 % | 0.803 ± 0.010 | 100 % |

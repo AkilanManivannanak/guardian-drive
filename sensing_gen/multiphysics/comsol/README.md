@@ -3,6 +3,12 @@
 The goal is to rebuild the wet-electrode case of `electrode_skin_fv.py` in COMSOL Multiphysics and compare the two
 with one command. Budget: one evening on the COMSOL trial (AC/DC Module).
 
+> **License terms first.** A COMSOL *evaluation* (trial) license allows experimental and trial use only. It does not
+> allow academic, commercial, professional or production use, and **results obtained with it may not be disseminated**.
+> With a trial license, run the comparison privately and do **not** use `--update-readme` or commit
+> `comsol_comparison.json` / `fig_comsol.png`. Publish COMSOL results only with a full (e.g. university) license, or
+> with written permission from COMSOL.
+
 ## 1. Build the model (about 45 minutes)
 
 1. **New model:** *2D* → *AC/DC* → *Electric Currents (ec)* → *Frequency Domain* study.

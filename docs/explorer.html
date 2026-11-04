@@ -38,6 +38,7 @@ h2{font-size:18px;margin:0 0 4px}
 p.lead{color:var(--text-secondary);margin:0 0 20px;max-width:760px}
 a{color:var(--accent)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 22px}
+@media (min-width:900px){.tiles{grid-template-columns:repeat(3,1fr)}}
 .tile{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
 @media (max-width:520px){.tile .big{font-size:18px!important}}
 .tile .big{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
@@ -84,6 +85,8 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
     <button role="tab" data-tab="mp" aria-selected="false">Multiphysics electrode</button>
     <button role="tab" data-tab="car" aria-selected="false">Real driving ECG</button>
     <button role="tab" data-tab="pinn" aria-selected="false">PINN denoising</button>
+    <button role="tab" data-tab="sur" aria-selected="false">Neural surrogate</button>
+    <button role="tab" data-tab="sc" aria-selected="false">How much real data?</button>
   </nav>
 
   <section class="panel" id="p-rob">
@@ -148,6 +151,26 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
     <div class="chart" id="pinn-chart"></div>
   </section>
 
+
+  <section class="panel" id="p-sur" hidden>
+    <h2>A neural surrogate learns the finite-element simulator to 0.02 % error</h2>
+    <p class="finding" id="sur-find"></p>
+    <div class="legend" id="sur-legend"></div>
+    <div class="ctitle">Median |Z| error on 1,000 held-out FE spectra vs number of FE training simulations (%, log scale)</div>
+    <div class="chart" id="sur-chart"></div>
+    <details open><summary>All models, and the design check</summary><div id="sur-table"></div><div id="des-table" style="margin-top:12px"></div></details>
+  </section>
+
+  <section class="panel" id="p-sc" hidden>
+    <h2>10 % real data + 8,000 generated ECG matches 100 % real data; simulator samples do not</h2>
+    <p class="finding">10 % of PTB-XL plus N synthetic records, against training on real data alone. The generators saw only the 10 % subset. Every run uses the physics sensor-model augmentation; mean ± std over 3 seeds. Real-only AUROC is flat from 10 % to 50 % and seeds vary by about ±0.01, so read this as a trend, not an exact exchange rate.</p>
+    <div class="controls">Test set:
+      <span class="seg" id="sc-seg"><button aria-pressed="true" data-v="clean">Clean</button><button aria-pressed="false" data-v="nstdb_0dB">Real noise, 0 dB</button></span>
+    </div>
+    <div class="legend" id="sc-legend"></div>
+    <div class="chart" id="sc-chart"></div>
+    <details><summary>Table view</summary><div id="sc-table"></div></details>
+  </section>
   <footer>Data: PTB-XL, MIT-BIH NSTDB and drivedb (PhysioNet). Code, protocol and raw result files:
     <a href="https://github.com/AKilalours/guardian-drive">github.com/AKilalours/guardian-drive</a> ·
     <a href="sensing_gen_report.pdf">technical report (PDF)</a>.</footer>
@@ -208,6 +231,7 @@ const tiles = [
   [`${D.tstr.toFixed(3)} vs ${D.trtr.toFixed(3)}`, "AUROC trained only on generated ECG vs on real ECG"],
   [`${D.cal.beats.toLocaleString()} beats`, `Physics model fitted to real heartbeats, median R² ${D.cal.r2}`],
   [pct(D.drv[0].car[0]), `False cardiac alarms on ${D.drv_meta.records} real drives (clinical: ${pct(D.drv[0].ptb[0])})`],
+  ["0.02 %", "Error of the neural surrogate of the FE electrode simulator, 37,714× faster"],
 ];
 document.getElementById("tiles").innerHTML = tiles.map(([b, l]) => `<div class="tile"><div class="big">${b}</div><div class="lab">${l}</div></div>`).join("");
 
@@ -316,8 +340,41 @@ function drawPinn() {
 }
 seg("pinn-seg", v => { pinnSnr = v; drawPinn(); });
 
+
+/* ---------- surrogate ---------- */
+const D2 = {"sur":{"n":[250,500,1000,2000,4000],"plain":[0.4628,0.2045,0.1303,0.1072,0.0996],"hybrid":[0.1103,0.0534,0.0311,0.0247,0.0228],"models":[["quadratic_ridge_plain",1.671,7.09,null],["quadratic_ridge_hybrid",0.737,3.5,null],["analytic_contact_prior_only",8.711,47.24,null],["ensemble_plain",0.097,0.39,0.9916190476190476],["ensemble_hybrid",0.023,0.24,0.9784761904761905]],"speed":37714,"ood_sigma":4.1},"sc":{"sizes":[500,1000,2000,4000,8000],"fr":[0.1,0.25,0.5,1.0],"real":{"clean":[[0.8089,0.0029],[0.7981,0.002],[0.8081,0.0049],[0.8243,0.0106]],"nstdb_0dB":[[0.7898,0.007],[0.7806,0.0027],[0.7862,0.0046],[0.8017,0.0139]]},"syn":{"simulator":{"clean":[[0.7913,0.0052],[0.7842,0.006],[0.7848,0.0051],[0.799,0.0077],[0.7916,0.0098]],"nstdb_0dB":[[0.7801,0.0041],[0.7727,0.0032],[0.7706,0.0071],[0.7835,0.0028],[0.7785,0.0119]]},"sim_pretrained_diffusion":{"clean":[[0.8073,0.0047],[0.8023,0.008],[0.7934,0.0114],[0.8089,0.0104],[0.8216,0.0039]],"nstdb_0dB":[[0.7814,0.0028],[0.7785,0.0111],[0.7709,0.0252],[0.7882,0.0078],[0.8028,0.01]]}}},"des":{"surrogate_robust":[9.1,25.9,1.21],"surrogate_nominal_tissue":[9.1,25.9,1.21],"fe_grid_best":[11.0,24.0,1.34],"common_w10_s25":[10.0,25.0,1.3],"max_spacing_w5_s30":[5.0,30.0,0.0]}};
+function drawSur() {
+  const S = D2.sur;
+  document.getElementById("sur-find").textContent = `4,000 finite-element impedance spectra over 10 tissue, contact and geometry parameters. The hybrid model learns only the correction to an analytic contact-impedance prior, so it needs far fewer simulations. It is ${S.speed.toLocaleString()}× faster than the solver, its 95 % intervals cover 98 % of held-out values, and its uncertainty rises ${S.ood_sigma}× outside the training range.`;
+  legend("sur-legend", [["Plain deep ensemble", "--s-base"], ["Hybrid: physics prior + deep ensemble", "--s1"]]);
+  lineChart(document.getElementById("sur-chart"), { cats: S.n.map(n => n.toLocaleString()), series: [
+    { name: "Plain ensemble", color: "--s-base", vals: S.plain.map(v => [v, 0]) },
+    { name: "Hybrid ensemble", color: "--s1", vals: S.hybrid.map(v => [v, 0]) }], y0: 0.01, y1: 1, log: true, fmt: v => v.toFixed(v < 0.1 ? 2 : 2) + " %", h: 260 });
+  const nm = { quadratic_ridge_plain: "Quadratic ridge", quadratic_ridge_hybrid: "Quadratic ridge + physics prior", analytic_contact_prior_only: "Analytic contact prior alone", ensemble_plain: "Deep ensemble", ensemble_hybrid: "Deep ensemble + physics prior" };
+  table("sur-table", ["Model", "Median |Z| error", "p95 |Z| error", "95 % coverage"], S.models.map(m => [nm[m[0]] || m[0], m[1] + " %", m[2] + " %", m[3] == null ? "–" : (100 * m[3]).toFixed(0) + " %"]));
+  const dn = { surrogate_robust: "Gradient optimum through the surrogate", surrogate_nominal_tissue: "Same, nominal tissue only", fe_grid_best: "Brute-force FE grid optimum", common_w10_s25: "Common layout", max_spacing_w5_s30: "Maximise-spacing heuristic" };
+  table("des-table", ["Electrode design (FE-verified)", "Width (mm)", "Spacing (mm)", "SNR vs max-spacing"], Object.entries(D2.des).map(([k, v]) => [dn[k] || k, v[0], v[1], (v[2] >= 0 ? "+" : "") + v[2].toFixed(2) + " dB"]));
+}
+/* ---------- scaling ---------- */
+let scKey = "clean";
+function drawSc() {
+  const S = D2.sc, k = scKey;
+  const ser = [
+    { name: "10 % real only", color: "--s-base", vals: S.sizes.map(() => [S.real[k][0][0], 0]) },
+    { name: "100 % real only", color: "--s3", vals: S.sizes.map(() => [S.real[k][3][0], 0]) },
+    { name: "10 % real + physics simulator", color: "--s2", vals: S.syn.simulator[k] },
+    { name: "10 % real + diffusion", color: "--s1", vals: S.syn.sim_pretrained_diffusion[k] }];
+  legend("sc-legend", ser.map(s => [s.name, s.color]));
+  lineChart(document.getElementById("sc-chart"), { cats: S.sizes.map(n => "+" + n.toLocaleString()), series: ser, y0: k === "clean" ? 0.77 : 0.74, y1: 0.84, fmt: f3, h: 300 });
+  table("sc-table", ["Training data", "AUROC"], [
+    ...S.fr.map((f, i) => [`${Math.round(f * 100)} % real only`, `${f3(S.real[k][i][0])} ± ${f3(S.real[k][i][1])}`]),
+    ...S.sizes.map((n, i) => [`10 % real + ${n.toLocaleString()} simulator`, `${f3(S.syn.simulator[k][i][0])} ± ${f3(S.syn.simulator[k][i][1])}`]),
+    ...S.sizes.map((n, i) => [`10 % real + ${n.toLocaleString()} diffusion`, `${f3(S.syn.sim_pretrained_diffusion[k][i][0])} ± ${f3(S.syn.sim_pretrained_diffusion[k][i][1])}`])]);
+}
+seg("sc-seg", v => { scKey = v; drawSc(); });
+
 /* ---------- tabs + resize ---------- */
-const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn };
+const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn, sur: drawSur, sc: drawSc };
 let current = "rob";
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("#tabs button").forEach(x => x.setAttribute("aria-selected", x === b));

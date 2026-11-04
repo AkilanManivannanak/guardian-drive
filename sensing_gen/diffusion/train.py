@@ -58,7 +58,8 @@ def train_diffusion(x: np.ndarray, y: np.ndarray, hr: np.ndarray, steps: int, de
 @torch.no_grad()
 def generate(diff: GaussianDiffusion, labels: np.ndarray, hrs: np.ndarray, device: str,
              length: int = 1000, steps: int = 50, w: float = 2.0, batch: int = 256,
-             seed: int = 0, spacing: str = "trailing", threshold: str = "static") -> np.ndarray:
+             seed: int = 0, spacing: str = "trailing", threshold: str = "static",
+             phys: float = 0.0) -> np.ndarray:
     diff.eval()
     gen = torch.Generator().manual_seed(seed)
     out = []
@@ -67,6 +68,6 @@ def generate(diff: GaussianDiffusion, labels: np.ndarray, hrs: np.ndarray, devic
         yb = torch.tensor(labels[s : s + batch], dtype=torch.long, device=device)
         hb = torch.tensor(hrs[s : s + batch], dtype=torch.float32, device=device)
         xs = diff.ddim_sample(len(yb), length, yb, hb, steps=steps, w=w, gen=gen, spacing=spacing,
-                              threshold=threshold)
+                              threshold=threshold, phys=phys)
         out.append(xs[:, 0].float().cpu().numpy())
     return np.concatenate(out).astype(np.float32)
