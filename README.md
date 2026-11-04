@@ -23,6 +23,12 @@
 
 ## 60-second tour
 
+| Try it | What happens |
+|---|---|
+| [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AKilalours/guardian-drive/blob/main/notebooks/quickstart.ipynb) | Generate ECG with the diffusion model, corrupt it with the physics sensor model, and check the neural surrogate against the finite-element solver (free CPU runtime, about 2 minutes). |
+| [**Electrode designer (live)**](https://akilalours.github.io/guardian-drive/docs/explorer.html) | Sliders for electrode width, lift-off, skin hydration and tissue layers; the trained surrogate ensemble runs in your browser and redraws the impedance spectrum with its uncertainty band. Presets overlay the FE solver's answer. |
+| `pip install -e ".[sensing]"` then `sensing-gen --help` | The same components as a library and command line ([model card](docs/MODEL_CARD.md)). |
+
 <p align="center">
   <a href="https://akilalours.github.io/guardian-drive/docs/explorer.html"><b>Open the interactive results explorer →</b></a><br>
   <sub>Toggle noise levels, compare samplers, drag an electrode off the skin, and draw random generated ECG. Every number comes from a result file in this repo.</sub>

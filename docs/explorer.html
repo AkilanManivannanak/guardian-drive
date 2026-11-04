@@ -68,6 +68,15 @@ input[type=range]{width:240px;accent-color:var(--accent)}
 .readout{font-variant-numeric:tabular-nums;color:var(--text-primary)}
 footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
 .sr{position:absolute;left:-9999px}
+.des-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px;margin:10px 0 6px}
+@media (max-width:720px){.des-grid{grid-template-columns:1fr}}
+.des-sliders label{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;font-size:13px;color:var(--text-secondary);margin:0 0 10px}
+.des-sliders input[type=range]{grid-column:1 / -1;width:100%}
+.des-sliders b{color:var(--text-primary);font-variant-numeric:tabular-nums;font-weight:600}
+.des-read{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+.des-read > div{border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.des-read .v{font-size:20px;font-weight:650;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.des-read .l{font-size:12px;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -83,6 +92,7 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
     <button role="tab" data-tab="rob" aria-selected="true">Robustness to real noise</button>
     <button role="tab" data-tab="diff" aria-selected="false">Diffusion sampler fix</button>
     <button role="tab" data-tab="mp" aria-selected="false">Multiphysics electrode</button>
+    <button role="tab" data-tab="des" aria-selected="false">Electrode designer (live)</button>
     <button role="tab" data-tab="car" aria-selected="false">Real driving ECG</button>
     <button role="tab" data-tab="pinn" aria-selected="false">PINN denoising</button>
     <button role="tab" data-tab="sur" aria-selected="false">Neural surrogate</button>
@@ -133,6 +143,20 @@ footer{margin-top:22px;font-size:12.5px;color:var(--text-muted)}
       <div><div class="ctitle">|Z| / |Z₀| at 10 Hz vs lift-off</div><div class="chart" id="mp-lift"></div></div>
       <div><div class="ctitle">Two-electrode impedance spectrum (Ω, log–log)</div><div class="chart" id="mp-spec"></div></div>
     </div>
+  </section>
+
+  <section class="panel" id="p-des" hidden>
+    <h2>Design an electrode in your browser: the trained neural surrogate runs live</h2>
+    <p class="finding">Move the sliders and the 5-network ensemble (trained on 4,000 finite-element simulations, weights compressed to 8 bits) recomputes the two-electrode impedance spectrum and its uncertainty here in your browser, in about a millisecond. The presets also show the finite-element solver's answer as dots, so you can check the surrogate against the physics.</p>
+    <div class="controls">Preset:
+      <span class="seg" id="des-presets"></span>
+    </div>
+    <div class="des-grid">
+      <div id="des-sliders" class="des-sliders"></div>
+      <div class="des-read" id="des-read"></div>
+    </div>
+    <div class="legend" id="des-legend"></div>
+    <div class="chart" id="des-chart"><p class="finding">Loading the surrogate (1 MB)…</p></div>
   </section>
 
   <section class="panel" id="p-car" hidden>
@@ -400,8 +424,97 @@ function drawBeh() {
 }
 seg("beh-seg", v => { behReg = v; drawBeh(); });
 
+
+/* ---------- live electrode designer (surrogate in the browser) ---------- */
+let SUR = null, desP = null, desPreset = null;
+const DES_SLIDERS = [
+  ["w_el_mm", "Electrode width", v => v.toFixed(1) + " mm"],
+  ["s_el_mm", "Electrode spacing", v => v.toFixed(1) + " mm"],
+  ["lift", "Lift-off of one electrode", v => Math.round(v * 100) + " %"],
+  ["sig_sc", "Skin hydration (stratum-corneum conductivity)", v => (v * 1e6).toFixed(1) + " µS/m"],
+  ["t_fat_mm", "Fat thickness", v => v.toFixed(1) + " mm"],
+  ["t_derm_mm", "Dermis thickness", v => v.toFixed(2) + " mm"]];
+function b64(s, T) { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); }
+function prepLayer(L) { return { r: L.rows, c: L.cols, q: b64(L.q, Int8Array), s: b64(L.s, Float32Array), b: b64(L.b, Float32Array) }; }
+function lin(L, x, act) {
+  const y = new Float32Array(L.r);
+  for (let r = 0; r < L.r; r++) { let a = 0; const o = r * L.c; for (let c = 0; c < L.c; c++) a += L.q[o + c] * x[c];
+    let v = L.b[r] + L.s[r] * a; if (act) v = v / (1 + Math.exp(-v)); y[r] = v; }
+  return y;
+}
+function toUnit(p) { return SUR.names.map((n, i) => { const lo = SUR.lo[i], hi = SUR.hi[i], v = p[n];
+  return SUR.log[i] ? (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) : (v - lo) / (hi - lo); }); }
+function fromUnit(n, u) { const i = SUR.names.indexOf(n), lo = SUR.lo[i], hi = SUR.hi[i];
+  return SUR.log[i] ? Math.exp(Math.log(lo) + u * (Math.log(hi) - Math.log(lo))) : lo + u * (hi - lo); }
+function contactPrior(p) {
+  const geo = (1 / (p.w_el_mm * 1e-3 * (1 - p.lift)) + 1 / (p.w_el_mm * 1e-3)) / 0.01, out = [];
+  const lz = [], ph = [];
+  SUR.freqs.forEach(f => { const b = 2 * Math.PI * f * 8.854e-12 * p.eps_sc;
+    lz.push(Math.log10(geo) - (0.5 * Math.log10(p.sig_sc ** 2 + b ** 2) - Math.log10(20e-6))); ph.push(-Math.atan2(b, p.sig_sc)); });
+  return lz.concat(ph);
+}
+function surrogate(p) {
+  const x = Float32Array.from(toUnit(p).map(u => 2 * u - 1)), D = SUR.y_mean.length, K = SUR.M.length;
+  const mus = [], vars = [];
+  SUR.M.forEach(m => { let h = x; m.layers.forEach(L => { h = lin(L, h, true); });
+    mus.push(lin(m.mu, h, false)); vars.push(Array.from(lin(m.lv, h, false), v => Math.exp(Math.min(4, Math.max(-14, v))))); });
+  const pr = contactPrior(p), mean = [], sd = [];
+  for (let d = 0; d < D; d++) { let m = 0, s2 = 0; for (let k = 0; k < K; k++) { m += mus[k][d]; s2 += vars[k][d] + mus[k][d] ** 2; }
+    m /= K; const v = Math.max(1e-12, s2 / K - m * m);
+    mean.push(m * SUR.y_std[d] + SUR.y_mean[d] + pr[d]); sd.push(Math.sqrt(v) * SUR.y_std[d]); }
+  const n = D / 2;
+  return { absZ: mean.slice(0, n).map(v => 10 ** v), phase: mean.slice(n).map(v => v * 180 / Math.PI), sdLog: sd.slice(0, n) };
+}
+window.__surrogate = p => surrogate({ ...SUR.defaults, ...p });
+async function loadSur() {
+  if (SUR) return;
+  const d = await (await fetch("surrogate_web.json")).json();
+  d.M = d.members.map(m => ({ layers: m.layers.map(prepLayer), mu: prepLayer(m.mu), lv: prepLayer(m.lv) }));
+  SUR = d; desP = { ...d.defaults };
+  const box = document.getElementById("des-sliders");
+  box.innerHTML = DES_SLIDERS.map(([n, lab]) => `<label>${lab} <b id="des-v-${n}"></b><input type="range" min="0" max="1" step="0.005" id="des-${n}" aria-label="${lab}"></label>`).join("");
+  DES_SLIDERS.forEach(([n]) => document.getElementById("des-" + n).addEventListener("input", e => { desP[n] = fromUnit(n, +e.target.value); desPreset = null; segOff(); drawDes(); }));
+  const ps = document.getElementById("des-presets");
+  ps.innerHTML = Object.keys(d.presets).map((k, i) => `<button aria-pressed="${i === 0}" data-v="${k}">${k}</button>`).join("");
+  ps.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    ps.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    desPreset = b.dataset.v; desP = { ...d.presets[desPreset].params }; syncSliders(); drawDes(); }));
+  desPreset = Object.keys(d.presets)[0]; syncSliders();
+}
+function segOff() { document.querySelectorAll("#des-presets button").forEach(x => x.setAttribute("aria-pressed", "false")); }
+function syncSliders() { DES_SLIDERS.forEach(([n]) => { const i = SUR.names.indexOf(n), lo = SUR.lo[i], hi = SUR.hi[i], v = desP[n];
+  document.getElementById("des-" + n).value = SUR.log[i] ? (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) : (v - lo) / (hi - lo); }); }
+async function drawDes() {
+  try { await loadSur(); } catch (e) { document.getElementById("des-chart").innerHTML = `<p class="finding">The live model could not be loaded here (${e.message}). Open the page from GitHub Pages.</p>`; return; }
+  DES_SLIDERS.forEach(([n, , f]) => { document.getElementById("des-v-" + n).textContent = f(desP[n]); });
+  const r = surrogate(desP), r0 = surrogate({ ...desP, lift: 0 }), i10 = 5;
+  const pct = (10 ** (2 * r.sdLog[i10]) - 1) * 100;
+  document.getElementById("des-read").innerHTML = [
+    [(r.absZ[i10] / 1000).toFixed(1) + " kΩ", "|Z| at 10 Hz (ECG band)"],
+    [r.phase[i10].toFixed(1) + "°", "phase at 10 Hz"],
+    ["± " + pct.toFixed(2) + " %", "ensemble uncertainty (2σ) at 10 Hz"],
+    ["+" + ((r.absZ[i10] / r0.absZ[i10] - 1) * 100).toFixed(1) + " %", "|Z| rise caused by the lift-off"]]
+    .map(([v, l]) => `<div><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+  const fe = desPreset ? SUR.presets[desPreset].fe_abs : null;
+  legend("des-legend", [["Surrogate |Z| (±2σ band)", "--s1"], ...(fe ? [["Finite-element solver (precomputed for this preset)", "--s2"]] : [])]);
+  const box = document.getElementById("des-chart"); box.innerHTML = "";
+  const W = Math.max(300, box.clientWidth), H = 280, m = { l: 58, r: 16, t: 10, b: 34 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Impedance spectrum" }, box);
+  const ix = f => m.l + (Math.log10(f) / 4) * (W - m.l - m.r), y0 = 2.5, y1 = 6;
+  const iy = z => m.t + (1 - (Math.log10(z) - y0) / (y1 - y0)) * (H - m.t - m.b);
+  [1e3, 1e4, 1e5, 1e6].forEach(v => { el("line", { x1: m.l, x2: W - m.r, y1: iy(v), y2: iy(v), stroke: css("--grid") }, svg);
+    const t = el("text", { x: m.l - 8, y: iy(v) + 4, "text-anchor": "end", "font-size": 11.5, fill: css("--text-muted") }, svg); t.textContent = v >= 1e6 ? "1 MΩ" : (v / 1000) + " kΩ"; });
+  [1, 10, 100, 1000, 10000].forEach(f => { const t = el("text", { x: ix(f), y: H - 12, "text-anchor": "middle", "font-size": 11.5, fill: css("--text-muted") }, svg);
+    t.textContent = f >= 1000 ? f / 1000 + " kHz" : f + " Hz"; });
+  const F = SUR.freqs, up = F.map((f, i) => [ix(f), iy(r.absZ[i] * 10 ** (2 * r.sdLog[i]))]), dn = F.map((f, i) => [ix(f), iy(r.absZ[i] / 10 ** (2 * r.sdLog[i]))]).reverse();
+  el("path", { d: "M" + up.concat(dn).map(p => p.join(",")).join("L") + "Z", fill: css("--s1"), opacity: 0.22 }, svg);
+  el("path", { d: F.map((f, i) => `${i ? "L" : "M"}${ix(f)},${iy(r.absZ[i])}`).join(""), fill: "none", stroke: css("--s1"), "stroke-width": 2.2 }, svg);
+  if (fe) fe.forEach((z, i) => el("circle", { cx: ix(F[i]), cy: iy(z), r: 3.6, fill: css("--s2"), stroke: css("--surface-1"), "stroke-width": 1.5 }, svg));
+  el("line", { x1: ix(10), x2: ix(10), y1: m.t, y2: H - m.b, stroke: css("--text-muted"), "stroke-dasharray": "3 3" }, svg);
+}
+
 /* ---------- tabs + resize ---------- */
-const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn, sur: drawSur, sc: drawSc, beh: drawBeh };
+const drawers = { rob: drawRob, diff: () => { drawDiff(); drawSample(); }, mp: () => { drawMP(); drawSpec(); }, car: drawCar, pinn: drawPinn, sur: drawSur, sc: drawSc, beh: drawBeh, des: drawDes };
 let current = "rob";
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("#tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
